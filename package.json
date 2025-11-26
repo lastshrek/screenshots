@@ -13,8 +13,6 @@
   },
   "packageManager": "yarn@1.22.17",
   "scripts": {
-    "preinstall": "npx only-allow yarn",
-    "install": "npm run bootstrap",
     "bootstrap": "lerna bootstrap",
     "dev": "lerna run dev --parallel",
     "start": "lerna run start --parallel",
