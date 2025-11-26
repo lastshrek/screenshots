@@ -252,13 +252,22 @@ export default class Screenshots extends Events {
           contextIsolation: true,
         },
       });
+      // 保存视图
+      this.$views.set(display.id, view);
+
       view.webContents.loadURL(
         `file://${path.join(__dirname, '../../react-screenshots/electron/electron.html')}`,
       );
-      this.$views.set(display.id, view);
+      // 等待 UI 加载完成后再把 view 加到窗口并显示
+      view.webContents.once('did-finish-load', () => {
+        win.setBrowserView(view!);
+        win.show();
+      });
+    } else {
+      // 已有 view，直接绑定并显示窗口
+      win.setBrowserView(view!);
+      win.show();
     }
-
-    win.setBrowserView(view);
 
     // 适定平台
     if (process.platform === 'darwin') {
@@ -274,15 +283,15 @@ export default class Screenshots extends Events {
 
     win.blur();
     win.setBounds(display);
-    view.setBounds({
+    view!.setBounds({
       x: 0,
       y: 0,
       width: display.width,
       height: display.height,
     });
     win.setAlwaysOnTop(true);
-    win.show();
-  }
+    // win.show() 已在 view 加载完成的回调或已有 view 的 else 分支中处理，无需再次调用
+
 
   private async capture(display: Display): Promise<string> {
     this.logger('SCREENSHOTS:capture');
