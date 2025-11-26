@@ -6,9 +6,9 @@
   "module": "packages/electron-screenshots/lib/index.js",
   "types": "packages/electron-screenshots/lib/index.d.ts",
   "files": [
-    "packages/electron-screenshots/lib/**",
-    "packages/react-screenshots/lib/**",
-    "packages/react-screenshots/electron/**"
+    "packages/electron-screenshots/lib",
+    "packages/react-screenshots/lib",
+    "packages/react-screenshots/electron"
   ],
   "engines": {
     "node": ">=14"
