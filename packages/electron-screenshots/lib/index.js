@@ -253,7 +253,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.createWindow = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var win, view, windowTypes;
+            var win, view, windowTypes, htmlPath, reactScreenshotsPath;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -330,10 +330,29 @@ var Screenshots = /** @class */ (function (_super) {
                                     contextIsolation: true,
                                 },
                             });
-                            view.webContents.loadURL("file://".concat(path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html')));
+                            // 保存视图
                             this.$views.set(display.id, view);
+                            htmlPath = void 0;
+                            try {
+                                reactScreenshotsPath = require.resolve('react-screenshots');
+                                htmlPath = path_1.default.join(path_1.default.dirname(reactScreenshotsPath), '../electron/electron.html');
+                            }
+                            catch (err) {
+                                // 如果找不到包，使用相对路径（开发环境）
+                                htmlPath = path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html');
+                            }
+                            view.webContents.loadURL("file://".concat(htmlPath));
+                            // 等待 UI 加载完成后再把 view 加到窗口并显示
+                            view.webContents.once('did-finish-load', function () {
+                                win.setBrowserView(view);
+                                win.show();
+                            });
                         }
-                        win.setBrowserView(view);
+                        else {
+                            // 已有 view，直接绑定并显示窗口
+                            win.setBrowserView(view);
+                            win.show();
+                        }
                         // 适定平台
                         if (process.platform === 'darwin') {
                             win.setWindowButtonVisibility(false);
@@ -353,7 +372,6 @@ var Screenshots = /** @class */ (function (_super) {
                             height: display.height,
                         });
                         win.setAlwaysOnTop(true);
-                        win.show();
                         return [2 /*return*/];
                 }
             });

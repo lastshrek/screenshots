@@ -255,13 +255,29 @@ export default class Screenshots extends Events {
       // 保存视图
       this.$views.set(display.id, view);
 
-      view.webContents.loadURL(
-        `file://${path.join(__dirname, '../../react-screenshots/electron/electron.html')}`,
-      );
+      // 使用 require.resolve 来查找 react-screenshots 包的位置
+      // 这样无论是在开发环境还是在 node_modules 中都能正确找到路径
+      let htmlPath: string;
+      try {
+        // 尝试从 react-screenshots 包中解析路径
+        const reactScreenshotsPath = require.resolve('react-screenshots');
+        htmlPath = path.join(
+          path.dirname(reactScreenshotsPath),
+          '../electron/electron.html',
+        );
+      } catch (err) {
+        // 如果找不到包，使用相对路径（开发环境）
+        htmlPath = path.join(
+          __dirname,
+          '../../react-screenshots/electron/electron.html',
+        );
+      }
+
+      view.webContents.loadURL(`file://${htmlPath}`);
       // 等待 UI 加载完成后再把 view 加到窗口并显示
       view.webContents.once('did-finish-load', () => {
-        win.setBrowserView(view!);
-        win.show();
+        win!.setBrowserView(view!);
+        win!.show();
       });
     } else {
       // 已有 view，直接绑定并显示窗口
@@ -291,7 +307,7 @@ export default class Screenshots extends Events {
     });
     win.setAlwaysOnTop(true);
     // win.show() 已在 view 加载完成的回调或已有 view 的 else 分支中处理，无需再次调用
-
+  }
 
   private async capture(display: Display): Promise<string> {
     this.logger('SCREENSHOTS:capture');
