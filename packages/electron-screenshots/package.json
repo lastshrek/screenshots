@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "prepublishOnly": "npm run build",
+    "prepare": "npm run clean && tsc",
     "start": "cross-env DEBUG=electron-screenshots electron lib/demo.js",
     "dev": "tsc --sourceMap --watch",
     "build": "npm run lint && npm run clean && tsc",
