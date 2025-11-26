@@ -273,11 +273,38 @@ export default class Screenshots extends Events {
         );
       }
 
+      this.logger('Loading UI from:', htmlPath);
+
+      // 添加错误处理和调试
+      view.webContents.on(
+        'did-fail-load',
+        (event, errorCode, errorDescription, validatedURL) => {
+          this.logger(
+            'UI failed to load:',
+            errorCode,
+            errorDescription,
+            validatedURL,
+          );
+        },
+      );
+
+      view.webContents.on(
+        'console-message',
+        (event, level, message, line, sourceId) => {
+          this.logger('UI Console:', level, message, line, sourceId);
+        },
+      );
+
       view.webContents.loadURL(`file://${htmlPath}`);
       // 等待 UI 加载完成后再把 view 加到窗口并显示
       view.webContents.once('did-finish-load', () => {
+        this.logger('UI loaded successfully');
         win!.setBrowserView(view!);
         win!.show();
+
+        // 临时开启开发者工具来调试UI问题
+        // 你可以在这里看到具体的JavaScript错误
+        view!.webContents.openDevTools();
       });
     } else {
       // 已有 view，直接绑定并显示窗口

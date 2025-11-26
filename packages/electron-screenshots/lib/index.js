@@ -341,11 +341,23 @@ var Screenshots = /** @class */ (function (_super) {
                                 // 如果找不到包，使用相对路径（开发环境）
                                 htmlPath = path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html');
                             }
+                            this.logger('Loading UI from:', htmlPath);
+                            // 添加错误处理和调试
+                            view.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL) {
+                                _this.logger('UI failed to load:', errorCode, errorDescription, validatedURL);
+                            });
+                            view.webContents.on('console-message', function (event, level, message, line, sourceId) {
+                                _this.logger('UI Console:', level, message, line, sourceId);
+                            });
                             view.webContents.loadURL("file://".concat(htmlPath));
                             // 等待 UI 加载完成后再把 view 加到窗口并显示
                             view.webContents.once('did-finish-load', function () {
+                                _this.logger('UI loaded successfully');
                                 win.setBrowserView(view);
                                 win.show();
+                                // 临时开启开发者工具来调试UI问题
+                                // 你可以在这里看到具体的JavaScript错误
+                                view.webContents.openDevTools();
                             });
                         }
                         else {
