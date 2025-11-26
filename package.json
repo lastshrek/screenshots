@@ -1,12 +1,20 @@
 {
-  "name": "root",
-  "private": true,
+  "name": "electron-screenshots",
+  "version": "0.5.27",
+  "description": "electron 截图插件",
+  "main": "packages/electron-screenshots/lib/index.cjs.js",
+  "module": "packages/electron-screenshots/lib/index.js",
+  "types": "packages/electron-screenshots/lib/index.d.ts",
+  "files": [
+    "packages/electron-screenshots/lib/**"
+  ],
   "engines": {
     "node": ">=14"
   },
   "packageManager": "yarn@1.22.17",
   "scripts": {
     "preinstall": "npx only-allow yarn",
+    "prepare": "yarn run bootstrap && yarn run build",
     "install": "npm run bootstrap",
     "bootstrap": "lerna bootstrap",
     "dev": "lerna run dev --parallel",
@@ -16,7 +24,32 @@
     "release": "lerna publish",
     "alpha": "lerna publish --dist-tag alpha"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lastshrek/screenshots.git"
+  },
+  "keywords": [
+    "electron",
+    "screenshot",
+    "screenshots"
+  ],
+  "author": "lastshrek",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lastshrek/screenshots/issues"
+  },
+  "homepage": "https://github.com/lastshrek/screenshots#readme",
+  "dependencies": {
+    "debug": "^4.3.4",
+    "fs-extra": "^11.1.1",
+    "node-screenshots": "^0.2.1",
+    "react-screenshots": "^0.5.22"
+  },
+  "peerDependencies": {
+    "electron": ">=14"
+  },
   "devDependencies": {
     "lerna": "^6.6.1"
   }
 }
+
