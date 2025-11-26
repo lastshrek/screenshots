@@ -14,7 +14,6 @@
   "packageManager": "yarn@1.22.17",
   "scripts": {
     "preinstall": "npx only-allow yarn",
-    "prepare": "cd packages/electron-screenshots && yarn install --production=false && yarn build",
     "install": "npm run bootstrap",
     "bootstrap": "lerna bootstrap",
     "dev": "lerna run dev --parallel",
