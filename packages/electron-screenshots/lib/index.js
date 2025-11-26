@@ -81,6 +81,7 @@ var debug_1 = __importDefault(require("debug"));
 var electron_1 = require("electron");
 var events_1 = __importDefault(require("events"));
 var fs_extra_1 = __importDefault(require("fs-extra"));
+var path_1 = __importDefault(require("path"));
 var event_1 = __importDefault(require("./event"));
 var getDisplay_1 = require("./getDisplay");
 var padStart_1 = __importDefault(require("./padStart"));
@@ -329,7 +330,7 @@ var Screenshots = /** @class */ (function (_super) {
                                     contextIsolation: true,
                                 },
                             });
-                            view.webContents.loadURL("file://".concat(require.resolve('../../react-screenshots/electron/electron.html')));
+                            view.webContents.loadURL("file://".concat(path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html')));
                             this.$views.set(display.id, view);
                         }
                         win.setBrowserView(view);

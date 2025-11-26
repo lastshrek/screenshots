@@ -10,6 +10,7 @@ import {
 } from 'electron';
 import Events from 'events';
 import fs from 'fs-extra';
+import path from 'path';
 import Event from './event';
 import { Display, getAllDisplays } from './getDisplay';
 import padStart from './padStart';
@@ -252,7 +253,7 @@ export default class Screenshots extends Events {
         },
       });
       view.webContents.loadURL(
-        `file://${require.resolve('../../react-screenshots/electron/electron.html')}`,
+        `file://${path.join(__dirname, '../../react-screenshots/electron/electron.html')}`,
       );
       this.$views.set(display.id, view);
     }
