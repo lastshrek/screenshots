@@ -9,7 +9,7 @@ app.whenReady().then(() => {
     },
     singleWindow: true,
   });
-  screenshots.$view.webContents.openDevTools();
+  // screenshots.$view.webContents.openDevTools(); // 已改为多窗口模式
 
   globalShortcut.register('ctrl+shift+a', () => {
     screenshots.startCapture();

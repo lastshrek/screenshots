@@ -5,6 +5,16 @@ export interface Display extends Rectangle {
   scaleFactor: number
 }
 
+export const getAllDisplays = (): Display[] => screen.getAllDisplays()
+  .map(({ id, bounds, scaleFactor }) => ({
+    id,
+    x: Math.floor(bounds.x),
+    y: Math.floor(bounds.y),
+    width: Math.floor(bounds.width),
+    height: Math.floor(bounds.height),
+    scaleFactor,
+  }));
+
 export default (): Display => {
   const point = screen.getCursorScreenPoint();
   const { id, bounds, scaleFactor } = screen.getDisplayNearestPoint(point);
