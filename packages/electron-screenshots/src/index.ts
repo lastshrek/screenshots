@@ -252,7 +252,7 @@ export default class Screenshots extends Events {
         },
       });
       view.webContents.loadURL(
-        `file://${require.resolve('react-screenshots/electron/electron.html')}`,
+        `file://${require.resolve('../../react-screenshots/electron/electron.html')}`,
       );
       this.$views.set(display.id, view);
     }

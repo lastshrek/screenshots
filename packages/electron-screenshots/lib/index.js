@@ -329,7 +329,7 @@ var Screenshots = /** @class */ (function (_super) {
                                     contextIsolation: true,
                                 },
                             });
-                            view.webContents.loadURL("file://".concat(require.resolve('react-screenshots/electron/electron.html')));
+                            view.webContents.loadURL("file://".concat(require.resolve('../../react-screenshots/electron/electron.html')));
                             this.$views.set(display.id, view);
                         }
                         win.setBrowserView(view);
