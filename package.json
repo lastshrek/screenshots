@@ -6,7 +6,9 @@
   "module": "packages/electron-screenshots/lib/index.js",
   "types": "packages/electron-screenshots/lib/index.d.ts",
   "files": [
-    "packages/electron-screenshots/lib/**"
+    "packages/electron-screenshots/lib/**",
+    "packages/react-screenshots/lib/**",
+    "packages/react-screenshots/electron/**"
   ],
   "engines": {
     "node": ">=14"
@@ -39,8 +41,7 @@
   "dependencies": {
     "debug": "^4.3.4",
     "fs-extra": "^11.1.1",
-    "node-screenshots": "^0.2.1",
-    "react-screenshots": "^0.5.22"
+    "node-screenshots": "^0.2.1"
   },
   "peerDependencies": {
     "electron": ">=14"
