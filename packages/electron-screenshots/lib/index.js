@@ -510,6 +510,13 @@ var Screenshots = /** @class */ (function (_super) {
                                 win.moveTop();
                                 // 延迟启用 kiosk 模式，确保焦点已获得
                                 setTimeout(function () {
+                                    // 重新设置 BrowserView 的 bounds，确保正确
+                                    view.setBounds({
+                                        x: 0,
+                                        y: 0,
+                                        width: display.width,
+                                        height: display.height,
+                                    });
                                     win.setKiosk(true);
                                     win.focus(); // 再次确保窗口焦点
                                     view.webContents.focus(); // 再次确保BrowserView焦点
@@ -538,6 +545,13 @@ var Screenshots = /** @class */ (function (_super) {
                             win.moveTop();
                             // 延迟启用 kiosk 模式
                             setTimeout(function () {
+                                // 重新设置 BrowserView 的 bounds，确保正确
+                                view.setBounds({
+                                    x: 0,
+                                    y: 0,
+                                    width: display.width,
+                                    height: display.height,
+                                });
                                 win.setKiosk(true);
                                 win.focus();
                                 view.webContents.focus(); // 确保BrowserView的webContents也获得焦点
