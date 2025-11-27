@@ -95,6 +95,10 @@ export default class Screenshots extends Events {
     await Promise.all(
       displays.map((display) => this.createWindow(display, false)),
     );
+
+    // 等待所有窗口的 React 应用 ready
+    await this.isReady;
+    this.logger('All windows preloaded and ready');
   }
 
   /**
@@ -147,21 +151,8 @@ export default class Screenshots extends Events {
       }),
     );
 
-    // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
-    await Promise.race([
-      this.isReady,
-      new Promise((resolve) => {
-        setTimeout(() => resolve(undefined), 500);
-      }),
-    ]);
-
-    // 再等待一小段时间，确保React应用完全初始化
-    await new Promise((resolve) => {
-      setTimeout(() => resolve(undefined), 200);
-    });
-
-    // 现在发送截图数据
-    this.logger('Now sending screenshot data to all displays...');
+    // 窗口已预加载,React 应用已 ready,直接发送数据
+    this.logger('Sending screenshot data to all displays...');
     captures.forEach((cap) => {
       if (cap) {
         const view = this.$views.get(cap.display.id);
@@ -269,8 +260,10 @@ export default class Screenshots extends Events {
    * 初始化窗口
    */
   private async createWindow(display: Display, show: boolean = true): Promise<void> {
-    // 重置截图区域
-    await this.reset();
+    // 只在显示窗口时才重置截图区域,预加载时跳过
+    if (show) {
+      await this.reset();
+    }
 
     // 复用未销毁的窗口
     let win = this.$wins.get(display.id);
@@ -429,60 +422,6 @@ export default class Screenshots extends Events {
             this.logger('Window focused, moved to top, and kiosk enabled');
           }, 100);
         }
-
-        // 开启开发者工具查看错误（暂时关闭以测试焦点问题）
-        // view!.webContents.openDevTools();
-
-        // 延迟检查DOM是否正确渲染和事件监听
-        setTimeout(() => {
-          view!.webContents
-            .executeJavaScript(
-              `
-            const app = document.getElementById('app');
-            const screenshotDiv = document.querySelector('.screenshots');
-            const result = {
-              appExists: !!app,
-              appHasChildren: app ? app.children.length > 0 : false,
-              appInnerHTML: app ? app.innerHTML.substring(0, 200) : 'no app element',
-              bodyChildren: document.body.children.length,
-              scriptsCount: document.querySelectorAll('script').length,
-              hasReact: typeof window.React !== 'undefined',
-              screenshotsElement: !!screenshotDiv,
-              hasMouseListeners: screenshotDiv ? 'onmousedown' in screenshotDiv : false,
-              windowFocused: document.hasFocus()
-            };
-            console.log('DOM Check:', JSON.stringify(result, null, 2));
-            
-            // 测试点击事件 - 在多个层级监听
-            if (screenshotDiv) {
-              const testClick = (e) => {
-                console.log('🎉 Mouse click detected on screenshotDiv!', e.target.className);
-              };
-              screenshotDiv.addEventListener('mousedown', testClick, {once: false, capture: true});
-              
-              // 也在 document 级别监听
-              document.addEventListener('mousedown', (e) => {
-                console.log('🎯 Document mousedown:', e.target.tagName, e.target.className);
-              }, {once: false, capture: true});
-              
-              // 监听所有鼠标事件
-              ['mousemove', 'mouseenter', 'mouseover'].forEach(eventType => {
-                document.addEventListener(eventType, () => {
-                  console.log('👆 Mouse event:', eventType);
-                }, {once: true, capture: true});
-              });
-            }
-            
-            result;
-          `,
-            )
-            .then((result: any) => {
-              this.logger('DOM Check Result:', result);
-            })
-            .catch((err: any) => {
-              this.logger('DOM Check Error:', err);
-            });
-        }, 1000);
       });
     } else {
       // 已有 view，直接绑定并显示窗口

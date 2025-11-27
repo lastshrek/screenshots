@@ -125,6 +125,12 @@ var Screenshots = /** @class */ (function (_super) {
                         return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.createWindow(display, false); }))];
                     case 1:
                         _a.sent();
+                        // 等待所有窗口的 React 应用 ready
+                        return [4 /*yield*/, this.isReady];
+                    case 2:
+                        // 等待所有窗口的 React 应用 ready
+                        _a.sent();
+                        this.logger('All windows preloaded and ready');
                         return [2 /*return*/];
                 }
             });
@@ -218,25 +224,8 @@ var Screenshots = /** @class */ (function (_super) {
                             }); }))];
                     case 1:
                         captures = _a.sent();
-                        // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
-                        return [4 /*yield*/, Promise.race([
-                                this.isReady,
-                                new Promise(function (resolve) {
-                                    setTimeout(function () { return resolve(undefined); }, 500);
-                                }),
-                            ])];
-                    case 2:
-                        // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
-                        _a.sent();
-                        // 再等待一小段时间，确保React应用完全初始化
-                        return [4 /*yield*/, new Promise(function (resolve) {
-                                setTimeout(function () { return resolve(undefined); }, 200);
-                            })];
-                    case 3:
-                        // 再等待一小段时间，确保React应用完全初始化
-                        _a.sent();
-                        // 现在发送截图数据
-                        this.logger('Now sending screenshot data to all displays...');
+                        // 窗口已预加载,React 应用已 ready,直接发送数据
+                        this.logger('Sending screenshot data to all displays...');
                         captures.forEach(function (cap) {
                             if (cap) {
                                 var view = _this.$views.get(cap.display.id);
@@ -393,12 +382,13 @@ var Screenshots = /** @class */ (function (_super) {
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: 
-                    // 重置截图区域
-                    return [4 /*yield*/, this.reset()];
+                    case 0:
+                        if (!show) return [3 /*break*/, 2];
+                        return [4 /*yield*/, this.reset()];
                     case 1:
-                        // 重置截图区域
                         _a.sent();
+                        _a.label = 2;
+                    case 2:
                         win = this.$wins.get(display.id);
                         view = this.$views.get(display.id);
                         if (!win || win.isDestroyed()) {
@@ -516,19 +506,6 @@ var Screenshots = /** @class */ (function (_super) {
                                         _this.logger('Window focused, moved to top, and kiosk enabled');
                                     }, 100);
                                 }
-                                // 开启开发者工具查看错误（暂时关闭以测试焦点问题）
-                                // view!.webContents.openDevTools();
-                                // 延迟检查DOM是否正确渲染和事件监听
-                                setTimeout(function () {
-                                    view.webContents
-                                        .executeJavaScript("\n            const app = document.getElementById('app');\n            const screenshotDiv = document.querySelector('.screenshots');\n            const result = {\n              appExists: !!app,\n              appHasChildren: app ? app.children.length > 0 : false,\n              appInnerHTML: app ? app.innerHTML.substring(0, 200) : 'no app element',\n              bodyChildren: document.body.children.length,\n              scriptsCount: document.querySelectorAll('script').length,\n              hasReact: typeof window.React !== 'undefined',\n              screenshotsElement: !!screenshotDiv,\n              hasMouseListeners: screenshotDiv ? 'onmousedown' in screenshotDiv : false,\n              windowFocused: document.hasFocus()\n            };\n            console.log('DOM Check:', JSON.stringify(result, null, 2));\n            \n            // \u6D4B\u8BD5\u70B9\u51FB\u4E8B\u4EF6 - \u5728\u591A\u4E2A\u5C42\u7EA7\u76D1\u542C\n            if (screenshotDiv) {\n              const testClick = (e) => {\n                console.log('\uD83C\uDF89 Mouse click detected on screenshotDiv!', e.target.className);\n              };\n              screenshotDiv.addEventListener('mousedown', testClick, {once: false, capture: true});\n              \n              // \u4E5F\u5728 document \u7EA7\u522B\u76D1\u542C\n              document.addEventListener('mousedown', (e) => {\n                console.log('\uD83C\uDFAF Document mousedown:', e.target.tagName, e.target.className);\n              }, {once: false, capture: true});\n              \n              // \u76D1\u542C\u6240\u6709\u9F20\u6807\u4E8B\u4EF6\n              ['mousemove', 'mouseenter', 'mouseover'].forEach(eventType => {\n                document.addEventListener(eventType, () => {\n                  console.log('\uD83D\uDC46 Mouse event:', eventType);\n                }, {once: true, capture: true});\n              });\n            }\n            \n            result;\n          ")
-                                        .then(function (result) {
-                                        _this.logger('DOM Check Result:', result);
-                                    })
-                                        .catch(function (err) {
-                                        _this.logger('DOM Check Error:', err);
-                                    });
-                                }, 1000);
                             });
                         }
                         else {
