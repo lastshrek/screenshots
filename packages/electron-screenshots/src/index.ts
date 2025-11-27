@@ -182,7 +182,7 @@ export default class Screenshots extends Events {
         // this.logger('endCapture: restoring window state', id);
         win.setKiosk(false);
         // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
-        win.blur();
+        // win.blur(); // 移除 blur，避免干扰 Dock 栏恢复
         win.blurWebView();
         win.unmaximize();
 
@@ -199,7 +199,7 @@ export default class Screenshots extends Events {
           } else {
             win.destroy();
           }
-        }, 200);
+        }, 400); // 增加延迟到 400ms
       }
     });
 
