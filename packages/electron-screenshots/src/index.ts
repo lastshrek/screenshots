@@ -410,7 +410,7 @@ export default class Screenshots extends Events {
             .executeJavaScript(
               `
             const app = document.getElementById('app');
-            const screenshots = document.querySelector('.screenshots');
+            const screenshotDiv = document.querySelector('.screenshots');
             const result = {
               appExists: !!app,
               appHasChildren: app ? app.children.length > 0 : false,
@@ -418,17 +418,17 @@ export default class Screenshots extends Events {
               bodyChildren: document.body.children.length,
               scriptsCount: document.querySelectorAll('script').length,
               hasReact: typeof window.React !== 'undefined',
-              screenshotsElement: !!screenshots,
-              hasMouseListeners: screenshots ? 'onmousedown' in screenshots : false,
+              screenshotsElement: !!screenshotDiv,
+              hasMouseListeners: screenshotDiv ? 'onmousedown' in screenshotDiv : false,
               windowFocused: document.hasFocus()
             };
             console.log('DOM Check:', JSON.stringify(result, null, 2));
             
             // 测试点击事件
-            if (screenshots) {
+            if (screenshotDiv) {
               const testClick = () => console.log('🎉 Mouse click detected!');
-              screenshots.addEventListener('mousedown', testClick, {once: true});
-              setTimeout(() => screenshots.removeEventListener('mousedown', testClick), 5000);
+              screenshotDiv.addEventListener('mousedown', testClick, {once: true});
+              setTimeout(() => screenshotDiv.removeEventListener('mousedown', testClick), 5000);
             }
             
             result;
