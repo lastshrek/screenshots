@@ -83,12 +83,6 @@ var Screenshots = /** @class */ (function (_super) {
         _this.$views = new Map();
         // 记录当前使用的临时文件，用于清理
         _this.tempFiles = new Set();
-        _this.isReady = new Promise(function (resolve) {
-            electron_1.ipcMain.once('SCREENSHOTS:ready', function () {
-                _this.logger('SCREENSHOTS:ready');
-                resolve();
-            });
-        });
         // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
         _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger)
             || (function () {
@@ -101,6 +95,8 @@ var Screenshots = /** @class */ (function (_super) {
             });
         _this.singleWindow = (_a = opts === null || opts === void 0 ? void 0 : opts.singleWindow) !== null && _a !== void 0 ? _a : true; // Default to true for performance
         _this.useKiosk = (_b = opts === null || opts === void 0 ? void 0 : opts.kiosk) !== null && _b !== void 0 ? _b : true;
+        // 初始化 isReady
+        _this.isReady = _this.createReadyPromise();
         _this.listenIpc();
         if (opts === null || opts === void 0 ? void 0 : opts.lang) {
             _this.setLang(opts.lang);
@@ -111,6 +107,15 @@ var Screenshots = /** @class */ (function (_super) {
         _this.cleanupOldTempFiles();
         return _this;
     }
+    Screenshots.prototype.createReadyPromise = function () {
+        var _this = this;
+        return new Promise(function (resolve) {
+            electron_1.ipcMain.once('SCREENSHOTS:ready', function () {
+                _this.logger('SCREENSHOTS:ready');
+                resolve();
+            });
+        });
+    };
     /**
      * 清理旧的临时文件
      */
@@ -175,6 +180,8 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.logger('startCapture');
+                        // 重置 isReady Promise，确保等待新的窗口 ready 事件
+                        this.isReady = this.createReadyPromise();
                         displays = (0, getDisplay_1.getAllDisplays)();
                         return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.capture(display)
                                 .then(function (url) { return ({ display: display, url: url }); })

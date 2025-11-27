@@ -40,6 +40,7 @@ export default class Screenshots extends Events {
     private useKiosk;
     private isReady;
     constructor(opts?: ScreenshotsOpts);
+    private createReadyPromise;
     /**
      * 清理旧的临时文件
      */

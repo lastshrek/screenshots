@@ -65,13 +65,7 @@ export default class Screenshots extends Events {
 
   private useKiosk: boolean;
 
-  private isReady = new Promise<void>((resolve) => {
-    ipcMain.once('SCREENSHOTS:ready', () => {
-      this.logger('SCREENSHOTS:ready');
-
-      resolve();
-    });
-  });
+  private isReady: Promise<void>;
 
   constructor(opts?: ScreenshotsOpts) {
     super();
@@ -83,6 +77,8 @@ export default class Screenshots extends Events {
       });
     this.singleWindow = opts?.singleWindow ?? true; // Default to true for performance
     this.useKiosk = opts?.kiosk ?? true;
+    // 初始化 isReady
+    this.isReady = this.createReadyPromise();
     this.listenIpc();
     if (opts?.lang) {
       this.setLang(opts.lang);
@@ -93,6 +89,15 @@ export default class Screenshots extends Events {
 
     // 清理旧的临时文件
     this.cleanupOldTempFiles();
+  }
+
+  private createReadyPromise(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      ipcMain.once('SCREENSHOTS:ready', () => {
+        this.logger('SCREENSHOTS:ready');
+        resolve();
+      });
+    });
   }
 
   /**
@@ -126,6 +131,9 @@ export default class Screenshots extends Events {
    */
   public async startCapture(): Promise<void> {
     this.logger('startCapture');
+
+    // 重置 isReady Promise，确保等待新的窗口 ready 事件
+    this.isReady = this.createReadyPromise();
 
     const displays = getAllDisplays();
 
