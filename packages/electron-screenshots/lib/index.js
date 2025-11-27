@@ -505,6 +505,10 @@ var Screenshots = /** @class */ (function (_super) {
                                 _this.logger('UI loaded successfully');
                                 win.setBrowserView(view);
                                 win.show();
+                                // 确保窗口获得焦点
+                                win.focus();
+                                win.moveTop();
+                                _this.logger('Window focused and moved to top');
                                 // 开启开发者工具查看错误
                                 view.webContents.openDevTools();
                                 // 延迟检查DOM是否正确渲染和事件监听
@@ -524,6 +528,9 @@ var Screenshots = /** @class */ (function (_super) {
                             // 已有 view，直接绑定并显示窗口
                             win.setBrowserView(view);
                             win.show();
+                            win.focus();
+                            win.moveTop();
+                            this.logger('Reused window focused and moved to top');
                         }
                         // 适定平台
                         if (process.platform === 'darwin') {
