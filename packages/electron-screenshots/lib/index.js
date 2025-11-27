@@ -342,12 +342,13 @@ var Screenshots = /** @class */ (function (_super) {
                                 htmlPath = path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html');
                             }
                             this.logger('Loading UI from:', htmlPath);
-                            // 添加错误处理和调试
-                            view.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL) {
-                                _this.logger('UI failed to load:', errorCode, errorDescription, validatedURL);
+                            // 监听加载失败
+                            view.webContents.on('did-fail-load', function (event, errorCode, errorDescription) {
+                                _this.logger('UI failed to load:', errorCode, errorDescription);
                             });
-                            view.webContents.on('console-message', function (event, level, message, line, sourceId) {
-                                _this.logger('UI Console:', level, message, line, sourceId);
+                            // 监听控制台消息
+                            view.webContents.on('console-message', function (event, level, message) {
+                                _this.logger("UI Console [".concat(level, "]:"), message);
                             });
                             view.webContents.loadURL("file://".concat(htmlPath));
                             // 等待 UI 加载完成后再把 view 加到窗口并显示
@@ -355,8 +356,7 @@ var Screenshots = /** @class */ (function (_super) {
                                 _this.logger('UI loaded successfully');
                                 win.setBrowserView(view);
                                 win.show();
-                                // 临时开启开发者工具来调试UI问题
-                                // 你可以在这里看到具体的JavaScript错误
+                                // 开启开发者工具查看错误
                                 view.webContents.openDevTools();
                             });
                         }
