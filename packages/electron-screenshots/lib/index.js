@@ -73,11 +73,19 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var debug_1 = __importDefault(require("debug"));
 var electron_1 = require("electron");
 var events_1 = __importDefault(require("events"));
 var fs_extra_1 = __importDefault(require("fs-extra"));
@@ -100,7 +108,16 @@ var Screenshots = /** @class */ (function (_super) {
                 resolve();
             });
         });
-        _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger) || (0, debug_1.default)('electron-screenshots');
+        // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
+        _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger)
+            || (function () {
+                var args = [];
+                for (var _i = 0; _i < arguments.length; _i++) {
+                    args[_i] = arguments[_i];
+                }
+                // eslint-disable-next-line no-console
+                console.log.apply(console, __spreadArray(['[electron-screenshots]'], args, false));
+            });
         _this.singleWindow = (_a = opts === null || opts === void 0 ? void 0 : opts.singleWindow) !== null && _a !== void 0 ? _a : true; // Default to true for performance
         _this.listenIpc();
         if (opts === null || opts === void 0 ? void 0 : opts.lang) {

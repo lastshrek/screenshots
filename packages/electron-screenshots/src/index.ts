@@ -1,4 +1,4 @@
-import debug, { Debugger } from 'debug';
+import { Debugger } from 'debug';
 import {
   BrowserView,
   BrowserWindow,
@@ -62,7 +62,12 @@ export default class Screenshots extends Events {
 
   constructor(opts?: ScreenshotsOpts) {
     super();
-    this.logger = opts?.logger || debug('electron-screenshots');
+    // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
+    this.logger = opts?.logger
+      || ((...args: unknown[]) => {
+        // eslint-disable-next-line no-console
+        console.log('[electron-screenshots]', ...args);
+      });
     this.singleWindow = opts?.singleWindow ?? true; // Default to true for performance
     this.listenIpc();
     if (opts?.lang) {
