@@ -179,7 +179,10 @@ var Screenshots = /** @class */ (function (_super) {
         }
         var status = electron_1.systemPreferences.getMediaAccessStatus('screen');
         this.logger('Screen recording permission status:', status);
-        return status === 'granted';
+        // 允许 'granted' 和 'not-determined' 状态
+        // 'not-determined' 时系统会在首次截图时自动弹出权限请求
+        // 只有明确 'denied' 或 'restricted' 时才阻止
+        return status !== 'denied' && status !== 'restricted';
     };
     /**
      * 开始截图
@@ -194,8 +197,8 @@ var Screenshots = /** @class */ (function (_super) {
                         this.logger('startCapture');
                         // 检查屏幕录制权限（仅 macOS）
                         if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
-                            this.logger('Screen recording permission not granted');
-                            throw new Error('Screen recording permission is required. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.');
+                            this.logger('Screen recording permission denied');
+                            throw new Error('Screen recording permission was denied. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.');
                         }
                         // 重置 isReady Promise，确保等待新的窗口 ready 事件
                         this.isReady = this.createReadyPromise();
