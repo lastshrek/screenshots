@@ -404,21 +404,33 @@ export default class Screenshots extends Events {
         // 开启开发者工具查看错误
         view!.webContents.openDevTools();
 
-        // 延迟检查DOM是否正确渲染
+        // 延迟检查DOM是否正确渲染和事件监听
         setTimeout(() => {
           view!.webContents
             .executeJavaScript(
               `
             const app = document.getElementById('app');
+            const screenshots = document.querySelector('.screenshots');
             const result = {
               appExists: !!app,
               appHasChildren: app ? app.children.length > 0 : false,
               appInnerHTML: app ? app.innerHTML.substring(0, 200) : 'no app element',
               bodyChildren: document.body.children.length,
               scriptsCount: document.querySelectorAll('script').length,
-              hasReact: typeof window.React !== 'undefined'
+              hasReact: typeof window.React !== 'undefined',
+              screenshotsElement: !!screenshots,
+              hasMouseListeners: screenshots ? 'onmousedown' in screenshots : false,
+              windowFocused: document.hasFocus()
             };
             console.log('DOM Check:', JSON.stringify(result, null, 2));
+            
+            // 测试点击事件
+            if (screenshots) {
+              const testClick = () => console.log('🎉 Mouse click detected!');
+              screenshots.addEventListener('mousedown', testClick, {once: true});
+              setTimeout(() => screenshots.removeEventListener('mousedown', testClick), 5000);
+            }
+            
             result;
           `,
             )
