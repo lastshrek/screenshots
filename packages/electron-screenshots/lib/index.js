@@ -152,8 +152,8 @@ var Screenshots = /** @class */ (function (_super) {
                             }); }))];
                     case 1:
                         captures = _a.sent();
+                        // 等待所有窗口创建完成
                         return [4 /*yield*/, Promise.all(captures.map(function (cap) { return __awaiter(_this, void 0, void 0, function () {
-                                var view;
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
                                         case 0:
@@ -161,15 +161,40 @@ var Screenshots = /** @class */ (function (_super) {
                                             return [4 /*yield*/, this.createWindow(cap.display)];
                                         case 1:
                                             _a.sent();
-                                            view = this.$views.get(cap.display.id);
-                                            view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
                                             _a.label = 2;
                                         case 2: return [2 /*return*/];
                                     }
                                 });
                             }); }))];
                     case 2:
+                        // 等待所有窗口创建完成
                         _a.sent();
+                        // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
+                        return [4 /*yield*/, Promise.race([
+                                this.isReady,
+                                new Promise(function (resolve) {
+                                    setTimeout(function () { return resolve(undefined); }, 500);
+                                }),
+                            ])];
+                    case 3:
+                        // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
+                        _a.sent();
+                        // 再等待一小段时间，确保React应用完全初始化
+                        return [4 /*yield*/, new Promise(function (resolve) {
+                                setTimeout(function () { return resolve(undefined); }, 200);
+                            })];
+                    case 4:
+                        // 再等待一小段时间，确保React应用完全初始化
+                        _a.sent();
+                        // 现在发送截图数据
+                        this.logger('Now sending screenshot data to all displays...');
+                        captures.forEach(function (cap) {
+                            if (cap) {
+                                var view = _this.$views.get(cap.display.id);
+                                _this.logger('Sending screenshot data to display', cap.display.id, 'url length:', cap.url.length);
+                                view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+                            }
+                        });
                         return [2 /*return*/];
                 }
             });

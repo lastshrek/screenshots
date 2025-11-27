@@ -99,15 +99,42 @@ export default class Screenshots extends Events {
         })),
     );
 
+    // 等待所有窗口创建完成
     await Promise.all(
       captures.map(async (cap) => {
         if (cap) {
           await this.createWindow(cap.display);
-          const view = this.$views.get(cap.display.id);
-          view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
         }
       }),
     );
+
+    // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
+    await Promise.race([
+      this.isReady,
+      new Promise((resolve) => {
+        setTimeout(() => resolve(undefined), 500);
+      }),
+    ]);
+
+    // 再等待一小段时间，确保React应用完全初始化
+    await new Promise((resolve) => {
+      setTimeout(() => resolve(undefined), 200);
+    });
+
+    // 现在发送截图数据
+    this.logger('Now sending screenshot data to all displays...');
+    captures.forEach((cap) => {
+      if (cap) {
+        const view = this.$views.get(cap.display.id);
+        this.logger(
+          'Sending screenshot data to display',
+          cap.display.id,
+          'url length:',
+          cap.url.length,
+        );
+        view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+      }
+    });
   }
 
   /**
