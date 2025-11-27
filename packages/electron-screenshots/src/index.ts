@@ -306,7 +306,7 @@ export default class Screenshots extends Events {
         fullscreen: false,
         // mac fullscreenable 设置为 true 会导致应用崩溃
         fullscreenable: false,
-        kiosk: true,
+        kiosk: false, // 先不启用 kiosk，等窗口显示后再启用
         backgroundColor: '#00000000',
         titleBarStyle: 'hidden',
         hasShadow: false,
@@ -321,8 +321,8 @@ export default class Screenshots extends Events {
 
       this.emit('windowCreated', win);
       win.on('show', () => {
-        win?.focus();
-        win?.setKiosk(true);
+        // focus 在 did-finish-load 中处理
+        // kiosk 也在那里处理
       });
 
       win.on('closed', () => {
@@ -401,10 +401,16 @@ export default class Screenshots extends Events {
         win!.setBrowserView(view!);
         win!.show();
 
-        // 确保窗口获得焦点
+        // 先获得焦点，再启用 kiosk 模式
         win!.focus();
         win!.moveTop();
-        this.logger('Window focused and moved to top');
+
+        // 延迟启用 kiosk 模式，确保焦点已获得
+        setTimeout(() => {
+          win!.setKiosk(true);
+          win!.focus(); // 再次确保焦点
+          this.logger('Window focused, moved to top, and kiosk enabled');
+        }, 100);
 
         // 开启开发者工具查看错误
         view!.webContents.openDevTools();
@@ -453,7 +459,13 @@ export default class Screenshots extends Events {
       win.show();
       win.focus();
       win.moveTop();
-      this.logger('Reused window focused and moved to top');
+
+      // 延迟启用 kiosk 模式
+      setTimeout(() => {
+        win!.setKiosk(true);
+        win!.focus();
+        this.logger('Reused window focused, moved to top, and kiosk enabled');
+      }, 100);
     }
 
     // 适定平台

@@ -444,7 +444,7 @@ var Screenshots = /** @class */ (function (_super) {
                                 fullscreen: false,
                                 // mac fullscreenable 设置为 true 会导致应用崩溃
                                 fullscreenable: false,
-                                kiosk: true,
+                                kiosk: false,
                                 backgroundColor: '#00000000',
                                 titleBarStyle: 'hidden',
                                 hasShadow: false,
@@ -457,8 +457,8 @@ var Screenshots = /** @class */ (function (_super) {
                             this.$wins.set(display.id, win);
                             this.emit('windowCreated', win);
                             win.on('show', function () {
-                                win === null || win === void 0 ? void 0 : win.focus();
-                                win === null || win === void 0 ? void 0 : win.setKiosk(true);
+                                // focus 在 did-finish-load 中处理
+                                // kiosk 也在那里处理
                             });
                             win.on('closed', function () {
                                 _this.emit('windowClosed', win);
@@ -505,10 +505,15 @@ var Screenshots = /** @class */ (function (_super) {
                                 _this.logger('UI loaded successfully');
                                 win.setBrowserView(view);
                                 win.show();
-                                // 确保窗口获得焦点
+                                // 先获得焦点，再启用 kiosk 模式
                                 win.focus();
                                 win.moveTop();
-                                _this.logger('Window focused and moved to top');
+                                // 延迟启用 kiosk 模式，确保焦点已获得
+                                setTimeout(function () {
+                                    win.setKiosk(true);
+                                    win.focus(); // 再次确保焦点
+                                    _this.logger('Window focused, moved to top, and kiosk enabled');
+                                }, 100);
                                 // 开启开发者工具查看错误
                                 view.webContents.openDevTools();
                                 // 延迟检查DOM是否正确渲染和事件监听
@@ -530,7 +535,12 @@ var Screenshots = /** @class */ (function (_super) {
                             win.show();
                             win.focus();
                             win.moveTop();
-                            this.logger('Reused window focused and moved to top');
+                            // 延迟启用 kiosk 模式
+                            setTimeout(function () {
+                                win.setKiosk(true);
+                                win.focus();
+                                _this.logger('Reused window focused, moved to top, and kiosk enabled');
+                            }, 100);
                         }
                         // 适定平台
                         if (process.platform === 'darwin') {
