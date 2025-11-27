@@ -24,8 +24,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function () { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
-    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function () { return this; }), g;
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
@@ -156,8 +156,7 @@ var Screenshots = /** @class */ (function (_super) {
                         files = _a.sent();
                         now_1 = Date.now();
                         // 清理超过1小时的文件
-                        return [4 /*yield*/, Promise.all(files.map(function (file) {
-                            return __awaiter(_this, void 0, void 0, function () {
+                        return [4 /*yield*/, Promise.all(files.map(function (file) { return __awaiter(_this, void 0, void 0, function () {
                                 var filePath, stats;
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
@@ -175,8 +174,7 @@ var Screenshots = /** @class */ (function (_super) {
                                         case 3: return [2 /*return*/];
                                     }
                                 });
-                            });
-                        }))];
+                            }); }))];
                     case 3:
                         // 清理超过1小时的文件
                         _a.sent();
@@ -203,46 +201,40 @@ var Screenshots = /** @class */ (function (_super) {
                     case 0:
                         this.logger('startCapture');
                         displays = (0, getDisplay_1.getAllDisplays)();
-                        return [4 /*yield*/, Promise.all(displays.map(function (display) {
-                            return __awaiter(_this, void 0, void 0, function () {
-                                var url, err_2;
+                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.capture(display)
+                                .then(function (url) { return ({ display: display, url: url }); })
+                                .catch(function (err) {
+                                _this.logger("Failed to capture display ".concat(display.id, ":"), err);
+                                return null;
+                            }); }))];
+                    case 1:
+                        captures = _a.sent();
+                        // 截图完成后，再创建/显示窗口
+                        return [4 /*yield*/, Promise.all(captures.map(function (cap) { return __awaiter(_this, void 0, void 0, function () {
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
                                         case 0:
-                                            _a.trys.push([0, 2, , 3]);
-                                            return [4 /*yield*/, Promise.all([
-                                                this.capture(display),
-                                                this.createWindow(display, true),
-                                            ])];
+                                            if (!cap) return [3 /*break*/, 2];
+                                            return [4 /*yield*/, this.createWindow(cap.display, true)];
                                         case 1:
-                                            url = (_a.sent())[0];
-                                            return [2 /*return*/, { display: display, url: url }];
-                                        case 2:
-                                            err_2 = _a.sent();
-                                            this.logger("Failed to capture display ".concat(display.id, ":"), err_2);
-                                            return [2 /*return*/, null];
-                                        case 3: return [2 /*return*/];
+                                            _a.sent();
+                                            _a.label = 2;
+                                        case 2: return [2 /*return*/];
                                     }
                                 });
-                            });
-                        }))];
-                    case 1:
-                        captures = _a.sent();
+                            }); }))];
+                    case 2:
+                        // 截图完成后，再创建/显示窗口
+                        _a.sent();
                         // 窗口已预加载,React 应用已 ready,直接发送数据
                         return [4 /*yield*/, this.isReady];
-                    case 2:
+                    case 3:
                         // 窗口已预加载,React 应用已 ready,直接发送数据
                         _a.sent(); // 确保应用已初始化
                         // this.logger('Sending screenshot data to all displays...');
                         captures.forEach(function (cap) {
                             if (cap) {
                                 var view = _this.$views.get(cap.display.id);
-                                // this.logger(
-                                //   'Sending screenshot data to display',
-                                //   cap.display.id,
-                                //   'url length:',
-                                //   cap.url.length,
-                                // );
                                 view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
                             }
                         });
@@ -315,9 +307,8 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         files = Array.from(this.tempFiles);
-                        return [4 /*yield*/, Promise.all(files.map(function (tempFile) {
-                            return __awaiter(_this, void 0, void 0, function () {
-                                var err_3;
+                        return [4 /*yield*/, Promise.all(files.map(function (tempFile) { return __awaiter(_this, void 0, void 0, function () {
+                                var err_2;
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
                                         case 0:
@@ -332,14 +323,13 @@ var Screenshots = /** @class */ (function (_super) {
                                             _a.label = 3;
                                         case 3: return [3 /*break*/, 5];
                                         case 4:
-                                            err_3 = _a.sent();
-                                            this.logger('Failed to cleanup temp file:', tempFile, err_3);
+                                            err_2 = _a.sent();
+                                            this.logger('Failed to cleanup temp file:', tempFile, err_2);
                                             return [3 /*break*/, 5];
                                         case 5: return [2 /*return*/];
                                     }
                                 });
-                            });
-                        }))];
+                            }); }))];
                     case 1:
                         _a.sent();
                         this.tempFiles.clear();
@@ -379,13 +369,13 @@ var Screenshots = /** @class */ (function (_super) {
                         });
                         // 保证 UI 有足够的时间渲染
                         return [4 /*yield*/, Promise.race([
-                            new Promise(function (resolve) {
-                                setTimeout(function () { return resolve(); }, 100);
-                            }),
-                            new Promise(function (resolve) {
-                                electron_1.ipcMain.once('SCREENSHOTS:reset', function () { return resolve(); });
-                            }),
-                        ])];
+                                new Promise(function (resolve) {
+                                    setTimeout(function () { return resolve(); }, 100);
+                                }),
+                                new Promise(function (resolve) {
+                                    electron_1.ipcMain.once('SCREENSHOTS:reset', function () { return resolve(); });
+                                }),
+                            ])];
                     case 1:
                         // 保证 UI 有足够的时间渲染
                         _a.sent();
@@ -595,7 +585,7 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var monitor, image, buffer, tempDir, tempFile, err_4, sources, source, pngBuffer, tempDir, tempFile;
+            var monitor, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -638,15 +628,15 @@ var Screenshots = /** @class */ (function (_super) {
                         this.logger('Screenshot saved to temp file:', tempFile, 'size:', buffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
                     case 6:
-                        err_4 = _a.sent();
-                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_4);
+                        err_3 = _a.sent();
+                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_3);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
-                            types: ['screen'],
-                            thumbnailSize: {
-                                width: display.width * display.scaleFactor,
-                                height: display.height * display.scaleFactor,
-                            },
-                        })];
+                                types: ['screen'],
+                                thumbnailSize: {
+                                    width: display.width * display.scaleFactor,
+                                    height: display.height * display.scaleFactor,
+                                },
+                            })];
                     case 7:
                         sources = _a.sent();
                         source = void 0;
@@ -657,10 +647,8 @@ var Screenshots = /** @class */ (function (_super) {
                             source = sources[0];
                         }
                         else {
-                            source = sources.find(function (item) {
-                                return item.display_id === display.id.toString()
-                                    || item.id.startsWith("screen:".concat(display.id, ":"));
-                            });
+                            source = sources.find(function (item) { return item.display_id === display.id.toString()
+                                || item.id.startsWith("screen:".concat(display.id, ":")); });
                         }
                         if (!source) {
                             this.logger("SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o", sources, display);
@@ -716,64 +704,62 @@ var Screenshots = /** @class */ (function (_super) {
         /**
          * SAVE事件
          */
-        electron_1.ipcMain.on('SCREENSHOTS:save', function (e, buffer, data) {
-            return __awaiter(_this, void 0, void 0, function () {
-                var event, win, time, year, month, date, hours, minutes, seconds, milliseconds, _a, canceled, filePath;
-                var _this = this;
-                return __generator(this, function (_b) {
-                    switch (_b.label) {
-                        case 0:
-                            this.logger('SCREENSHOTS:save buffer.length %d, data: %o', buffer.length, data);
-                            event = new event_1.default();
-                            this.emit('save', event, buffer, data);
-                            if (event.defaultPrevented) {
-                                return [2 /*return*/];
+        electron_1.ipcMain.on('SCREENSHOTS:save', function (e, buffer, data) { return __awaiter(_this, void 0, void 0, function () {
+            var event, win, time, year, month, date, hours, minutes, seconds, milliseconds, _a, canceled, filePath;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        this.logger('SCREENSHOTS:save buffer.length %d, data: %o', buffer.length, data);
+                        event = new event_1.default();
+                        this.emit('save', event, buffer, data);
+                        if (event.defaultPrevented) {
+                            return [2 /*return*/];
+                        }
+                        this.$views.forEach(function (view, id) {
+                            if (view.webContents === e.sender) {
+                                win = _this.$wins.get(id);
                             }
-                            this.$views.forEach(function (view, id) {
-                                if (view.webContents === e.sender) {
-                                    win = _this.$wins.get(id);
-                                }
-                            });
-                            if (!win) {
-                                return [2 /*return*/];
-                            }
-                            time = new Date();
-                            year = time.getFullYear();
-                            month = (0, padStart_1.default)(time.getMonth() + 1, 2, '0');
-                            date = (0, padStart_1.default)(time.getDate(), 2, '0');
-                            hours = (0, padStart_1.default)(time.getHours(), 2, '0');
-                            minutes = (0, padStart_1.default)(time.getMinutes(), 2, '0');
-                            seconds = (0, padStart_1.default)(time.getSeconds(), 2, '0');
-                            milliseconds = (0, padStart_1.default)(time.getMilliseconds(), 3, '0');
-                            win.setAlwaysOnTop(false);
-                            return [4 /*yield*/, electron_1.dialog.showSaveDialog(win, {
+                        });
+                        if (!win) {
+                            return [2 /*return*/];
+                        }
+                        time = new Date();
+                        year = time.getFullYear();
+                        month = (0, padStart_1.default)(time.getMonth() + 1, 2, '0');
+                        date = (0, padStart_1.default)(time.getDate(), 2, '0');
+                        hours = (0, padStart_1.default)(time.getHours(), 2, '0');
+                        minutes = (0, padStart_1.default)(time.getMinutes(), 2, '0');
+                        seconds = (0, padStart_1.default)(time.getSeconds(), 2, '0');
+                        milliseconds = (0, padStart_1.default)(time.getMilliseconds(), 3, '0');
+                        win.setAlwaysOnTop(false);
+                        return [4 /*yield*/, electron_1.dialog.showSaveDialog(win, {
                                 defaultPath: "".concat(year).concat(month).concat(date).concat(hours).concat(minutes).concat(seconds).concat(milliseconds, ".png"),
                                 filters: [
                                     { name: 'Image (png)', extensions: ['png'] },
                                     { name: 'All Files', extensions: ['*'] },
                                 ],
                             })];
-                        case 1:
-                            _a = _b.sent(), canceled = _a.canceled, filePath = _a.filePath;
-                            if (!win) {
-                                this.emit('afterSave', new event_1.default(), buffer, data, false); // isSaved = false
-                                return [2 /*return*/];
-                            }
-                            win.setAlwaysOnTop(true);
-                            if (canceled || !filePath) {
-                                this.emit('afterSave', new event_1.default(), buffer, data, false); // isSaved = false
-                                return [2 /*return*/];
-                            }
-                            return [4 /*yield*/, fs_extra_1.default.writeFile(filePath, buffer)];
-                        case 2:
-                            _b.sent();
-                            this.emit('afterSave', new event_1.default(), buffer, data, true); // isSaved = true
-                            this.endCapture();
+                    case 1:
+                        _a = _b.sent(), canceled = _a.canceled, filePath = _a.filePath;
+                        if (!win) {
+                            this.emit('afterSave', new event_1.default(), buffer, data, false); // isSaved = false
                             return [2 /*return*/];
-                    }
-                });
+                        }
+                        win.setAlwaysOnTop(true);
+                        if (canceled || !filePath) {
+                            this.emit('afterSave', new event_1.default(), buffer, data, false); // isSaved = false
+                            return [2 /*return*/];
+                        }
+                        return [4 /*yield*/, fs_extra_1.default.writeFile(filePath, buffer)];
+                    case 2:
+                        _b.sent();
+                        this.emit('afterSave', new event_1.default(), buffer, data, true); // isSaved = true
+                        this.endCapture();
+                        return [2 /*return*/];
+                }
             });
-        });
+        }); });
     };
     return Screenshots;
 }(events_1.default));

@@ -136,17 +136,19 @@ export default class Screenshots extends Events {
     const displays = getAllDisplays();
 
     const captures = await Promise.all(
-      displays.map(async (display) => {
-        try {
-          // 并行执行截图和窗口显示
-          const [url] = await Promise.all([
-            this.capture(display),
-            this.createWindow(display, true),
-          ]);
-          return { display, url };
-        } catch (err) {
+      displays.map((display) => this.capture(display)
+        .then((url) => ({ display, url }))
+        .catch((err) => {
           this.logger(`Failed to capture display ${display.id}:`, err);
           return null;
+        })),
+    );
+
+    // 截图完成后，再创建/显示窗口
+    await Promise.all(
+      captures.map(async (cap) => {
+        if (cap) {
+          await this.createWindow(cap.display, true);
         }
       }),
     );
@@ -157,12 +159,6 @@ export default class Screenshots extends Events {
     captures.forEach((cap) => {
       if (cap) {
         const view = this.$views.get(cap.display.id);
-        // this.logger(
-        //   'Sending screenshot data to display',
-        //   cap.display.id,
-        //   'url length:',
-        //   cap.url.length,
-        // );
         view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
       }
     });
