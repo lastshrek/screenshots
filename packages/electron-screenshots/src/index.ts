@@ -152,6 +152,7 @@ export default class Screenshots extends Events {
     );
 
     // 窗口已预加载,React 应用已 ready,直接发送数据
+    await this.isReady; // 确保应用已初始化
     this.logger('Sending screenshot data to all displays...');
     captures.forEach((cap) => {
       if (cap) {
@@ -179,24 +180,32 @@ export default class Screenshots extends Events {
       const view = this.$views.get(id);
       if (win && !win.isDestroyed()) {
         win.setKiosk(false);
-        win.blur();
+        win.blur(); // 保持 blur 以确保失去焦点
         win.blurWebView();
         win.unmaximize();
-        if (view) {
-          win.removeBrowserView(view);
-        }
 
-        if (this.singleWindow) {
-          win.hide();
-        } else {
-          win.destroy();
-        }
+        // 延迟隐藏窗口，等待 macOS 动画/状态更新完成
+        // 这解决了退出截图后任务栏消失的问题
+        setTimeout(() => {
+          if (view) {
+            win.removeBrowserView(view);
+          }
+
+          if (this.singleWindow) {
+            win.hide();
+          } else {
+            win.destroy();
+          }
+        }, 200);
       }
     });
 
     if (!this.singleWindow) {
-      this.$wins.clear();
-      this.$views.clear();
+      // 如果不是单窗口模式，延迟清理引用
+      setTimeout(() => {
+        this.$wins.clear();
+        this.$views.clear();
+      }, 200);
     }
 
     // 清理本次截图产生的临时文件
