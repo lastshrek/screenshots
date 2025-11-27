@@ -182,6 +182,11 @@ var Screenshots = /** @class */ (function (_super) {
                         this.logger('startCapture');
                         // 重置 isReady Promise，确保等待新的窗口 ready 事件
                         this.isReady = this.createReadyPromise();
+                        // 注册全局 ESC 快捷键，确保能退出
+                        electron_1.globalShortcut.register('Esc', function () {
+                            _this.logger('Global ESC pressed, ending capture');
+                            _this.endCapture();
+                        });
                         displays = (0, getDisplay_1.getAllDisplays)();
                         return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.capture(display)
                                 .then(function (url) { return ({ display: display, url: url }); })
@@ -237,6 +242,8 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.logger('endCapture');
+                        // 注销全局 ESC 快捷键
+                        electron_1.globalShortcut.unregister('Esc');
                         return [4 /*yield*/, this.reset()];
                     case 1:
                         _a.sent();

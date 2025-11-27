@@ -5,6 +5,7 @@ import {
   clipboard,
   desktopCapturer,
   dialog,
+  globalShortcut,
   ipcMain,
   nativeImage,
 } from 'electron';
@@ -135,6 +136,12 @@ export default class Screenshots extends Events {
     // 重置 isReady Promise，确保等待新的窗口 ready 事件
     this.isReady = this.createReadyPromise();
 
+    // 注册全局 ESC 快捷键，确保能退出
+    globalShortcut.register('Esc', () => {
+      this.logger('Global ESC pressed, ending capture');
+      this.endCapture();
+    });
+
     const displays = getAllDisplays();
 
     const captures = await Promise.all(
@@ -173,6 +180,10 @@ export default class Screenshots extends Events {
    */
   public async endCapture(): Promise<void> {
     this.logger('endCapture');
+
+    // 注销全局 ESC 快捷键
+    globalShortcut.unregister('Esc');
+
     await this.reset();
 
     // Iterate over all windows
