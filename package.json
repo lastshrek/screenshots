@@ -15,7 +15,6 @@
   },
   "packageManager": "yarn@1.22.17",
   "scripts": {
-    "postinstall": "npm run bootstrap && npm run build",
     "bootstrap": "lerna bootstrap",
     "dev": "lerna run dev --parallel",
     "start": "lerna run start --parallel",
