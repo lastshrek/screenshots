@@ -49,6 +49,9 @@ export default class Screenshots extends Events {
 
   public $views: Map<number, BrowserView> = new Map();
 
+  // 记录当前使用的临时文件，用于清理
+  private tempFiles: Set<string> = new Set();
+
   private logger: Logger;
 
   private singleWindow: boolean;
@@ -80,6 +83,35 @@ export default class Screenshots extends Events {
       // But createWindow requires a display.
       // We can defer it or just let the first capture be slightly slower but subsequent ones fast.
       // Or we can just rely on singleWindow reuse.
+    }
+
+    // 清理旧的临时文件
+    this.cleanupOldTempFiles();
+  }
+
+  /**
+   * 清理旧的临时文件
+   */
+  private async cleanupOldTempFiles(): Promise<void> {
+    try {
+      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+      if (await fs.pathExists(tempDir)) {
+        const files = await fs.readdir(tempDir);
+        const now = Date.now();
+        // 清理超过1小时的文件
+        await Promise.all(
+          files.map(async (file) => {
+            const filePath = path.join(tempDir, file);
+            const stats = await fs.stat(filePath);
+            if (now - stats.mtimeMs > 60 * 60 * 1000) {
+              await fs.remove(filePath);
+              this.logger('Cleaned up old temp file:', filePath);
+            }
+          }),
+        );
+      }
+    } catch (err) {
+      this.logger('Failed to cleanup old temp files:', err);
     }
   }
 
@@ -169,6 +201,29 @@ export default class Screenshots extends Events {
       this.$wins.clear();
       this.$views.clear();
     }
+
+    // 清理本次截图产生的临时文件
+    this.cleanupCurrentTempFiles();
+  }
+
+  /**
+   * 清理当前截图产生的临时文件
+   */
+  private async cleanupCurrentTempFiles(): Promise<void> {
+    const files = Array.from(this.tempFiles);
+    await Promise.all(
+      files.map(async (tempFile) => {
+        try {
+          if (await fs.pathExists(tempFile)) {
+            await fs.remove(tempFile);
+            this.logger('Cleaned up temp file:', tempFile);
+          }
+        } catch (err) {
+          this.logger('Failed to cleanup temp file:', tempFile, err);
+        }
+      }),
+    );
+    this.tempFiles.clear();
   }
 
   /**
@@ -446,6 +501,7 @@ export default class Screenshots extends Events {
         `screenshot-${display.id}-${Date.now()}.png`,
       );
       await fs.writeFile(tempFile, buffer);
+      this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
       this.logger(
         'Screenshot saved to temp file:',
         tempFile,
@@ -496,6 +552,7 @@ export default class Screenshots extends Events {
         `screenshot-${display.id}-${Date.now()}.png`,
       );
       await fs.writeFile(tempFile, pngBuffer);
+      this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
       this.logger(
         'Screenshot saved to temp file (desktopCapturer):',
         tempFile,

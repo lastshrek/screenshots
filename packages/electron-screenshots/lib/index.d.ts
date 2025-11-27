@@ -28,10 +28,15 @@ export { Bounds };
 export default class Screenshots extends Events {
     $wins: Map<number, BrowserWindow>;
     $views: Map<number, BrowserView>;
+    private tempFiles;
     private logger;
     private singleWindow;
     private isReady;
     constructor(opts?: ScreenshotsOpts);
+    /**
+     * 清理旧的临时文件
+     */
+    private cleanupOldTempFiles;
     /**
      * 开始截图
      */
@@ -40,6 +45,10 @@ export default class Screenshots extends Events {
      * 结束截图
      */
     endCapture(): Promise<void>;
+    /**
+     * 清理当前截图产生的临时文件
+     */
+    private cleanupCurrentTempFiles;
     /**
      * 设置语言
      */

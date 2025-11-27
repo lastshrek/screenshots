@@ -103,6 +103,8 @@ var Screenshots = /** @class */ (function (_super) {
         // 截图窗口对象
         _this.$wins = new Map();
         _this.$views = new Map();
+        // 记录当前使用的临时文件，用于清理
+        _this.tempFiles = new Set();
         _this.isReady = new Promise(function (resolve) {
             electron_1.ipcMain.once('SCREENSHOTS:ready', function () {
                 _this.logger('SCREENSHOTS:ready');
@@ -131,8 +133,63 @@ var Screenshots = /** @class */ (function (_super) {
             // We can defer it or just let the first capture be slightly slower but subsequent ones fast.
             // Or we can just rely on singleWindow reuse.
         }
+        // 清理旧的临时文件
+        _this.cleanupOldTempFiles();
         return _this;
     }
+    /**
+     * 清理旧的临时文件
+     */
+    Screenshots.prototype.cleanupOldTempFiles = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var tempDir_1, files, now_1, err_1;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 5, , 6]);
+                        tempDir_1 = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                        return [4 /*yield*/, fs_extra_1.default.pathExists(tempDir_1)];
+                    case 1:
+                        if (!_a.sent()) return [3 /*break*/, 4];
+                        return [4 /*yield*/, fs_extra_1.default.readdir(tempDir_1)];
+                    case 2:
+                        files = _a.sent();
+                        now_1 = Date.now();
+                        // 清理超过1小时的文件
+                        return [4 /*yield*/, Promise.all(files.map(function (file) { return __awaiter(_this, void 0, void 0, function () {
+                                var filePath, stats;
+                                return __generator(this, function (_a) {
+                                    switch (_a.label) {
+                                        case 0:
+                                            filePath = path_1.default.join(tempDir_1, file);
+                                            return [4 /*yield*/, fs_extra_1.default.stat(filePath)];
+                                        case 1:
+                                            stats = _a.sent();
+                                            if (!(now_1 - stats.mtimeMs > 60 * 60 * 1000)) return [3 /*break*/, 3];
+                                            return [4 /*yield*/, fs_extra_1.default.remove(filePath)];
+                                        case 2:
+                                            _a.sent();
+                                            this.logger('Cleaned up old temp file:', filePath);
+                                            _a.label = 3;
+                                        case 3: return [2 /*return*/];
+                                    }
+                                });
+                            }); }))];
+                    case 3:
+                        // 清理超过1小时的文件
+                        _a.sent();
+                        _a.label = 4;
+                    case 4: return [3 /*break*/, 6];
+                    case 5:
+                        err_1 = _a.sent();
+                        this.logger('Failed to cleanup old temp files:', err_1);
+                        return [3 /*break*/, 6];
+                    case 6: return [2 /*return*/];
+                }
+            });
+        });
+    };
     /**
      * 开始截图
      */
@@ -237,6 +294,50 @@ var Screenshots = /** @class */ (function (_super) {
                             this.$wins.clear();
                             this.$views.clear();
                         }
+                        // 清理本次截图产生的临时文件
+                        this.cleanupCurrentTempFiles();
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
+     * 清理当前截图产生的临时文件
+     */
+    Screenshots.prototype.cleanupCurrentTempFiles = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var files;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        files = Array.from(this.tempFiles);
+                        return [4 /*yield*/, Promise.all(files.map(function (tempFile) { return __awaiter(_this, void 0, void 0, function () {
+                                var err_2;
+                                return __generator(this, function (_a) {
+                                    switch (_a.label) {
+                                        case 0:
+                                            _a.trys.push([0, 4, , 5]);
+                                            return [4 /*yield*/, fs_extra_1.default.pathExists(tempFile)];
+                                        case 1:
+                                            if (!_a.sent()) return [3 /*break*/, 3];
+                                            return [4 /*yield*/, fs_extra_1.default.remove(tempFile)];
+                                        case 2:
+                                            _a.sent();
+                                            this.logger('Cleaned up temp file:', tempFile);
+                                            _a.label = 3;
+                                        case 3: return [3 /*break*/, 5];
+                                        case 4:
+                                            err_2 = _a.sent();
+                                            this.logger('Failed to cleanup temp file:', tempFile, err_2);
+                                            return [3 /*break*/, 5];
+                                        case 5: return [2 /*return*/];
+                                    }
+                                });
+                            }); }))];
+                    case 1:
+                        _a.sent();
+                        this.tempFiles.clear();
                         return [2 /*return*/];
                 }
             });
@@ -450,7 +551,7 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var Monitor, monitor, image, buffer, tempDir, tempFile, err_1, sources, source, pngBuffer, tempDir, tempFile;
+            var Monitor, monitor, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -492,11 +593,12 @@ var Screenshots = /** @class */ (function (_super) {
                         return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, buffer)];
                     case 6:
                         _a.sent();
+                        this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
                         this.logger('Screenshot saved to temp file:', tempFile, 'size:', buffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
                     case 7:
-                        err_1 = _a.sent();
-                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_1);
+                        err_3 = _a.sent();
+                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_3);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
                                 types: ['screen'],
                                 thumbnailSize: {
@@ -530,6 +632,7 @@ var Screenshots = /** @class */ (function (_super) {
                         return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, pngBuffer)];
                     case 10:
                         _a.sent();
+                        this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
                         this.logger('Screenshot saved to temp file (desktopCapturer):', tempFile, 'size:', pngBuffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
                     case 11: return [2 /*return*/];
