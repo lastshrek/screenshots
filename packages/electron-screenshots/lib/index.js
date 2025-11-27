@@ -104,38 +104,12 @@ var Screenshots = /** @class */ (function (_super) {
         if (opts === null || opts === void 0 ? void 0 : opts.lang) {
             _this.setLang(opts.lang);
         }
-        // 预加载窗口
-        _this.preloadWindows();
+        // 预加载窗口逻辑已移除，以避免抢占焦点导致部分窗口消失
+        // this.preloadWindows();
         // 清理旧的临时文件
         _this.cleanupOldTempFiles();
         return _this;
     }
-    /**
-     * 预加载窗口
-     */
-    Screenshots.prototype.preloadWindows = function () {
-        return __awaiter(this, void 0, void 0, function () {
-            var displays;
-            var _this = this;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        this.logger('preloadWindows');
-                        displays = (0, getDisplay_1.getAllDisplays)();
-                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.createWindow(display, false); }))];
-                    case 1:
-                        _a.sent();
-                        // 等待所有窗口的 React 应用 ready
-                        return [4 /*yield*/, this.isReady];
-                    case 2:
-                        // 等待所有窗口的 React 应用 ready
-                        _a.sent();
-                        this.logger('All windows preloaded and ready');
-                        return [2 /*return*/];
-                }
-            });
-        });
-    };
     /**
      * 清理旧的临时文件
      */
@@ -215,8 +189,10 @@ var Screenshots = /** @class */ (function (_super) {
                                     switch (_a.label) {
                                         case 0:
                                             if (!cap) return [3 /*break*/, 2];
+                                            // 这里不再复用预加载的窗口，而是直接创建并显示
                                             return [4 /*yield*/, this.createWindow(cap.display, true)];
                                         case 1:
+                                            // 这里不再复用预加载的窗口，而是直接创建并显示
                                             _a.sent();
                                             _a.label = 2;
                                         case 2: return [2 /*return*/];
@@ -226,12 +202,12 @@ var Screenshots = /** @class */ (function (_super) {
                     case 2:
                         // 截图完成后，再创建/显示窗口
                         _a.sent();
-                        // 窗口已预加载,React 应用已 ready,直接发送数据
+                        // 等待 React 应用 ready
                         return [4 /*yield*/, this.isReady];
                     case 3:
-                        // 窗口已预加载,React 应用已 ready,直接发送数据
-                        _a.sent(); // 确保应用已初始化
-                        // this.logger('Sending screenshot data to all displays...');
+                        // 等待 React 应用 ready
+                        _a.sent();
+                        // 发送数据
                         captures.forEach(function (cap) {
                             if (cap) {
                                 var view = _this.$views.get(cap.display.id);

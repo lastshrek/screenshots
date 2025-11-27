@@ -79,26 +79,11 @@ export default class Screenshots extends Events {
       this.setLang(opts.lang);
     }
 
-    // 预加载窗口
-    this.preloadWindows();
+    // 预加载窗口逻辑已移除，以避免抢占焦点导致部分窗口消失
+    // this.preloadWindows();
 
     // 清理旧的临时文件
     this.cleanupOldTempFiles();
-  }
-
-  /**
-   * 预加载窗口
-   */
-  private async preloadWindows(): Promise<void> {
-    this.logger('preloadWindows');
-    const displays = getAllDisplays();
-    await Promise.all(
-      displays.map((display) => this.createWindow(display, false)),
-    );
-
-    // 等待所有窗口的 React 应用 ready
-    await this.isReady;
-    this.logger('All windows preloaded and ready');
   }
 
   /**
@@ -148,14 +133,16 @@ export default class Screenshots extends Events {
     await Promise.all(
       captures.map(async (cap) => {
         if (cap) {
+          // 这里不再复用预加载的窗口，而是直接创建并显示
           await this.createWindow(cap.display, true);
         }
       }),
     );
 
-    // 窗口已预加载,React 应用已 ready,直接发送数据
-    await this.isReady; // 确保应用已初始化
-    // this.logger('Sending screenshot data to all displays...');
+    // 等待 React 应用 ready
+    await this.isReady;
+
+    // 发送数据
     captures.forEach((cap) => {
       if (cap) {
         const view = this.$views.get(cap.display.id);
