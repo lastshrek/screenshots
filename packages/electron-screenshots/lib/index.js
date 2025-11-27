@@ -511,11 +511,12 @@ var Screenshots = /** @class */ (function (_super) {
                                 // 延迟启用 kiosk 模式，确保焦点已获得
                                 setTimeout(function () {
                                     win.setKiosk(true);
-                                    win.focus(); // 再次确保焦点
+                                    win.focus(); // 再次确保窗口焦点
+                                    view.webContents.focus(); // 再次确保BrowserView焦点
                                     _this.logger('Window focused, moved to top, and kiosk enabled');
                                 }, 100);
-                                // 开启开发者工具查看错误
-                                view.webContents.openDevTools();
+                                // 开启开发者工具查看错误（暂时关闭以测试焦点问题）
+                                // view!.webContents.openDevTools();
                                 // 延迟检查DOM是否正确渲染和事件监听
                                 setTimeout(function () {
                                     view.webContents
