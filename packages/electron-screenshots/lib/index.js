@@ -539,6 +539,7 @@ var Screenshots = /** @class */ (function (_super) {
                             setTimeout(function () {
                                 win.setKiosk(true);
                                 win.focus();
+                                view.webContents.focus(); // 确保BrowserView的webContents也获得焦点
                                 _this.logger('Reused window focused, moved to top, and kiosk enabled');
                             }, 100);
                         }

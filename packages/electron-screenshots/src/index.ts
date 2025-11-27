@@ -464,6 +464,7 @@ export default class Screenshots extends Events {
       setTimeout(() => {
         win!.setKiosk(true);
         win!.focus();
+        view!.webContents.focus(); // 确保BrowserView的webContents也获得焦点
         this.logger('Reused window focused, moved to top, and kiosk enabled');
       }, 100);
     }
