@@ -505,6 +505,16 @@ export default class Screenshots extends Events {
       height: display.height,
     });
     win.setAlwaysOnTop(true);
+
+    // 诊断信息：确认窗口和view的状态
+    setTimeout(() => {
+      this.logger('Window bounds:', win!.getBounds());
+      this.logger('View bounds:', view!.getBounds());
+      this.logger('Window is visible:', win!.isVisible());
+      this.logger('Window is focused:', win!.isFocused());
+      this.logger('BrowserView attached:', win!.getBrowserViews().length);
+    }, 200);
+
     // win.show() 已在 view 加载完成的回调或已有 view 的 else 分支中处理，无需再次调用
   }
 

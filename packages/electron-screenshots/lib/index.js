@@ -564,6 +564,14 @@ var Screenshots = /** @class */ (function (_super) {
                             height: display.height,
                         });
                         win.setAlwaysOnTop(true);
+                        // 诊断信息：确认窗口和view的状态
+                        setTimeout(function () {
+                            _this.logger('Window bounds:', win.getBounds());
+                            _this.logger('View bounds:', view.getBounds());
+                            _this.logger('Window is visible:', win.isVisible());
+                            _this.logger('Window is focused:', win.isFocused());
+                            _this.logger('BrowserView attached:', win.getBrowserViews().length);
+                        }, 200);
                         return [2 /*return*/];
                 }
             });
