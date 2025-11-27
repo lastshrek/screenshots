@@ -248,8 +248,16 @@ var Screenshots = /** @class */ (function (_super) {
                                 // 延迟隐藏窗口，等待 macOS 动画/状态更新完成
                                 // 这解决了退出截图后任务栏消失的问题
                                 setTimeout(function () {
-                                    if (view) {
-                                        win.removeBrowserView(view);
+                                    if (win.isDestroyed()) {
+                                        return;
+                                    }
+                                    if (view && !view.webContents.isDestroyed()) {
+                                        try {
+                                            win.removeBrowserView(view);
+                                        }
+                                        catch (err) {
+                                            _this.logger('removeBrowserView failed:', err);
+                                        }
                                     }
                                     if (_this.singleWindow) {
                                         win.hide();
