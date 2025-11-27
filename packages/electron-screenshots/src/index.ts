@@ -436,11 +436,24 @@ export default class Screenshots extends Events {
             };
             console.log('DOM Check:', JSON.stringify(result, null, 2));
             
-            // 测试点击事件
+            // 测试点击事件 - 在多个层级监听
             if (screenshotDiv) {
-              const testClick = () => console.log('🎉 Mouse click detected!');
-              screenshotDiv.addEventListener('mousedown', testClick, {once: true});
-              setTimeout(() => screenshotDiv.removeEventListener('mousedown', testClick), 5000);
+              const testClick = (e) => {
+                console.log('🎉 Mouse click detected on screenshotDiv!', e.target.className);
+              };
+              screenshotDiv.addEventListener('mousedown', testClick, {once: false, capture: true});
+              
+              // 也在 document 级别监听
+              document.addEventListener('mousedown', (e) => {
+                console.log('🎯 Document mousedown:', e.target.tagName, e.target.className);
+              }, {once: false, capture: true});
+              
+              // 监听所有鼠标事件
+              ['mousemove', 'mouseenter', 'mouseover'].forEach(eventType => {
+                document.addEventListener(eventType, () => {
+                  console.log('👆 Mouse event:', eventType);
+                }, {once: true, capture: true});
+              });
             }
             
             result;
