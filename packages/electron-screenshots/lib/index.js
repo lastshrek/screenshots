@@ -535,7 +535,8 @@ var Screenshots = /** @class */ (function (_super) {
                                 skipTransformProcessType: true,
                             });
                         }
-                        win.blur();
+                        // 不要blur，否则窗口无法接收键盘和鼠标事件
+                        // win.blur();
                         win.setBounds(display);
                         view.setBounds({
                             x: 0,
