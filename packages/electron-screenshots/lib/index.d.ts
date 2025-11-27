@@ -34,6 +34,10 @@ export default class Screenshots extends Events {
     private isReady;
     constructor(opts?: ScreenshotsOpts);
     /**
+     * 预加载窗口
+     */
+    private preloadWindows;
+    /**
      * 清理旧的临时文件
      */
     private cleanupOldTempFiles;

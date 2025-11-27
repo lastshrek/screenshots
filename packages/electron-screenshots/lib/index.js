@@ -14,29 +14,6 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -91,6 +68,7 @@ var events_1 = __importDefault(require("events"));
 var fs_extra_1 = __importDefault(require("fs-extra"));
 var path_1 = __importDefault(require("path"));
 var os_1 = __importDefault(require("os"));
+var node_screenshots_1 = require("node-screenshots");
 var event_1 = __importDefault(require("./event"));
 var getDisplay_1 = require("./getDisplay");
 var padStart_1 = __importDefault(require("./padStart"));
@@ -126,17 +104,32 @@ var Screenshots = /** @class */ (function (_super) {
         if (opts === null || opts === void 0 ? void 0 : opts.lang) {
             _this.setLang(opts.lang);
         }
-        if (_this.singleWindow) {
-            // Pre-create window to speed up first capture
-            // We need a dummy display or primary display to create it
-            // But createWindow requires a display.
-            // We can defer it or just let the first capture be slightly slower but subsequent ones fast.
-            // Or we can just rely on singleWindow reuse.
-        }
+        // 预加载窗口
+        _this.preloadWindows();
         // 清理旧的临时文件
         _this.cleanupOldTempFiles();
         return _this;
     }
+    /**
+     * 预加载窗口
+     */
+    Screenshots.prototype.preloadWindows = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var displays;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.logger('preloadWindows');
+                        displays = (0, getDisplay_1.getAllDisplays)();
+                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.createWindow(display, false); }))];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
     /**
      * 清理旧的临时文件
      */
@@ -202,31 +195,29 @@ var Screenshots = /** @class */ (function (_super) {
                     case 0:
                         this.logger('startCapture');
                         displays = (0, getDisplay_1.getAllDisplays)();
-                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.capture(display)
-                                .then(function (url) { return ({ display: display, url: url }); })
-                                .catch(function (err) {
-                                _this.logger("Failed to capture display ".concat(display.id, ":"), err);
-                                return null;
-                            }); }))];
-                    case 1:
-                        captures = _a.sent();
-                        // 等待所有窗口创建完成
-                        return [4 /*yield*/, Promise.all(captures.map(function (cap) { return __awaiter(_this, void 0, void 0, function () {
+                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return __awaiter(_this, void 0, void 0, function () {
+                                var url, err_2;
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
                                         case 0:
-                                            if (!cap) return [3 /*break*/, 2];
-                                            return [4 /*yield*/, this.createWindow(cap.display)];
+                                            _a.trys.push([0, 2, , 3]);
+                                            return [4 /*yield*/, Promise.all([
+                                                    this.capture(display),
+                                                    this.createWindow(display, true),
+                                                ])];
                                         case 1:
-                                            _a.sent();
-                                            _a.label = 2;
-                                        case 2: return [2 /*return*/];
+                                            url = (_a.sent())[0];
+                                            return [2 /*return*/, { display: display, url: url }];
+                                        case 2:
+                                            err_2 = _a.sent();
+                                            this.logger("Failed to capture display ".concat(display.id, ":"), err_2);
+                                            return [2 /*return*/, null];
+                                        case 3: return [2 /*return*/];
                                     }
                                 });
                             }); }))];
-                    case 2:
-                        // 等待所有窗口创建完成
-                        _a.sent();
+                    case 1:
+                        captures = _a.sent();
                         // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
                         return [4 /*yield*/, Promise.race([
                                 this.isReady,
@@ -234,14 +225,14 @@ var Screenshots = /** @class */ (function (_super) {
                                     setTimeout(function () { return resolve(undefined); }, 500);
                                 }),
                             ])];
-                    case 3:
+                    case 2:
                         // 延迟发送截图数据，确保React应用已经ready并注册了事件监听器
                         _a.sent();
                         // 再等待一小段时间，确保React应用完全初始化
                         return [4 /*yield*/, new Promise(function (resolve) {
                                 setTimeout(function () { return resolve(undefined); }, 200);
                             })];
-                    case 4:
+                    case 3:
                         // 再等待一小段时间，确保React应用完全初始化
                         _a.sent();
                         // 现在发送截图数据
@@ -313,7 +304,7 @@ var Screenshots = /** @class */ (function (_super) {
                     case 0:
                         files = Array.from(this.tempFiles);
                         return [4 /*yield*/, Promise.all(files.map(function (tempFile) { return __awaiter(_this, void 0, void 0, function () {
-                                var err_2;
+                                var err_3;
                                 return __generator(this, function (_a) {
                                     switch (_a.label) {
                                         case 0:
@@ -328,8 +319,8 @@ var Screenshots = /** @class */ (function (_super) {
                                             _a.label = 3;
                                         case 3: return [3 /*break*/, 5];
                                         case 4:
-                                            err_2 = _a.sent();
-                                            this.logger('Failed to cleanup temp file:', tempFile, err_2);
+                                            err_3 = _a.sent();
+                                            this.logger('Failed to cleanup temp file:', tempFile, err_3);
                                             return [3 /*break*/, 5];
                                         case 5: return [2 /*return*/];
                                     }
@@ -395,7 +386,8 @@ var Screenshots = /** @class */ (function (_super) {
     /**
      * 初始化窗口
      */
-    Screenshots.prototype.createWindow = function (display) {
+    Screenshots.prototype.createWindow = function (display, show) {
+        if (show === void 0) { show = true; }
         return __awaiter(this, void 0, void 0, function () {
             var win, view, windowTypes, htmlPath, reactScreenshotsPath;
             var _this = this;
@@ -504,24 +496,26 @@ var Screenshots = /** @class */ (function (_super) {
                             view.webContents.once('did-finish-load', function () {
                                 _this.logger('UI loaded successfully');
                                 win.setBrowserView(view);
-                                win.show();
-                                // 先获得焦点，再启用 kiosk 模式
-                                win.focus();
-                                win.moveTop();
-                                // 延迟启用 kiosk 模式，确保焦点已获得
-                                setTimeout(function () {
-                                    // 重新设置 BrowserView 的 bounds，确保正确
-                                    view.setBounds({
-                                        x: 0,
-                                        y: 0,
-                                        width: display.width,
-                                        height: display.height,
-                                    });
-                                    win.setKiosk(true);
-                                    win.focus(); // 再次确保窗口焦点
-                                    view.webContents.focus(); // 再次确保BrowserView焦点
-                                    _this.logger('Window focused, moved to top, and kiosk enabled');
-                                }, 100);
+                                if (show) {
+                                    win.show();
+                                    // 先获得焦点，再启用 kiosk 模式
+                                    win.focus();
+                                    win.moveTop();
+                                    // 延迟启用 kiosk 模式，确保焦点已获得
+                                    setTimeout(function () {
+                                        // 重新设置 BrowserView 的 bounds，确保正确
+                                        view.setBounds({
+                                            x: 0,
+                                            y: 0,
+                                            width: display.width,
+                                            height: display.height,
+                                        });
+                                        win.setKiosk(true);
+                                        win.focus(); // 再次确保窗口焦点
+                                        view.webContents.focus(); // 再次确保BrowserView焦点
+                                        _this.logger('Window focused, moved to top, and kiosk enabled');
+                                    }, 100);
+                                }
                                 // 开启开发者工具查看错误（暂时关闭以测试焦点问题）
                                 // view!.webContents.openDevTools();
                                 // 延迟检查DOM是否正确渲染和事件监听
@@ -540,23 +534,25 @@ var Screenshots = /** @class */ (function (_super) {
                         else {
                             // 已有 view，直接绑定并显示窗口
                             win.setBrowserView(view);
-                            win.show();
-                            win.focus();
-                            win.moveTop();
-                            // 延迟启用 kiosk 模式
-                            setTimeout(function () {
-                                // 重新设置 BrowserView 的 bounds，确保正确
-                                view.setBounds({
-                                    x: 0,
-                                    y: 0,
-                                    width: display.width,
-                                    height: display.height,
-                                });
-                                win.setKiosk(true);
+                            if (show) {
+                                win.show();
                                 win.focus();
-                                view.webContents.focus(); // 确保BrowserView的webContents也获得焦点
-                                _this.logger('Reused window focused, moved to top, and kiosk enabled');
-                            }, 100);
+                                win.moveTop();
+                                // 延迟启用 kiosk 模式
+                                setTimeout(function () {
+                                    // 重新设置 BrowserView 的 bounds，确保正确
+                                    view.setBounds({
+                                        x: 0,
+                                        y: 0,
+                                        width: display.width,
+                                        height: display.height,
+                                    });
+                                    win.setKiosk(true);
+                                    win.focus();
+                                    view.webContents.focus(); // 确保BrowserView的webContents也获得焦点
+                                    _this.logger('Reused window focused, moved to top, and kiosk enabled');
+                                }, 100);
+                            }
                         }
                         // 适定平台
                         if (process.platform === 'darwin') {
@@ -593,18 +589,15 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var Monitor, monitor, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
+            var monitor, image, buffer, tempDir, tempFile, err_4, sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         this.logger('SCREENSHOTS:capture');
                         _a.label = 1;
                     case 1:
-                        _a.trys.push([1, 7, , 11]);
-                        return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('node-screenshots')); })];
-                    case 2:
-                        Monitor = (_a.sent()).Monitor;
-                        monitor = Monitor.fromPoint(display.x + display.width / 2, display.y + display.height / 2);
+                        _a.trys.push([1, 6, , 10]);
+                        monitor = node_screenshots_1.Monitor.fromPoint(display.x + display.width / 2, display.y + display.height / 2);
                         this.logger('SCREENSHOTS:capture Monitor.fromPoint arguments %o', display);
                         this.logger('SCREENSHOTS:capture Monitor.fromPoint return %o', {
                             id: monitor === null || monitor === void 0 ? void 0 : monitor.id,
@@ -622,25 +615,25 @@ var Screenshots = /** @class */ (function (_super) {
                             throw new Error("Monitor.fromDisplay(".concat(display.id, ") get null"));
                         }
                         return [4 /*yield*/, monitor.captureImage()];
-                    case 3:
+                    case 2:
                         image = _a.sent();
                         return [4 /*yield*/, image.toPng(true)];
-                    case 4:
+                    case 3:
                         buffer = _a.sent();
                         tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
                         return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
-                    case 5:
+                    case 4:
                         _a.sent();
                         tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
                         return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, buffer)];
-                    case 6:
+                    case 5:
                         _a.sent();
                         this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
                         this.logger('Screenshot saved to temp file:', tempFile, 'size:', buffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
-                    case 7:
-                        err_3 = _a.sent();
-                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_3);
+                    case 6:
+                        err_4 = _a.sent();
+                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_4);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
                                 types: ['screen'],
                                 thumbnailSize: {
@@ -648,7 +641,7 @@ var Screenshots = /** @class */ (function (_super) {
                                     height: display.height * display.scaleFactor,
                                 },
                             })];
-                    case 8:
+                    case 7:
                         sources = _a.sent();
                         source = void 0;
                         // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
@@ -668,16 +661,16 @@ var Screenshots = /** @class */ (function (_super) {
                         pngBuffer = source.thumbnail.toPNG();
                         tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
                         return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
-                    case 9:
+                    case 8:
                         _a.sent();
                         tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
                         return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, pngBuffer)];
-                    case 10:
+                    case 9:
                         _a.sent();
                         this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
                         this.logger('Screenshot saved to temp file (desktopCapturer):', tempFile, 'size:', pngBuffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
-                    case 11: return [2 /*return*/];
+                    case 10: return [2 /*return*/];
                 }
             });
         });

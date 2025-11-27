@@ -12,6 +12,7 @@ import Events from 'events';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { Monitor } from 'node-screenshots';
 import Event from './event';
 import { Display, getAllDisplays } from './getDisplay';
 import padStart from './padStart';
@@ -77,16 +78,23 @@ export default class Screenshots extends Events {
     if (opts?.lang) {
       this.setLang(opts.lang);
     }
-    if (this.singleWindow) {
-      // Pre-create window to speed up first capture
-      // We need a dummy display or primary display to create it
-      // But createWindow requires a display.
-      // We can defer it or just let the first capture be slightly slower but subsequent ones fast.
-      // Or we can just rely on singleWindow reuse.
-    }
+
+    // 预加载窗口
+    this.preloadWindows();
 
     // 清理旧的临时文件
     this.cleanupOldTempFiles();
+  }
+
+  /**
+   * 预加载窗口
+   */
+  private async preloadWindows(): Promise<void> {
+    this.logger('preloadWindows');
+    const displays = getAllDisplays();
+    await Promise.all(
+      displays.map((display) => this.createWindow(display, false)),
+    );
   }
 
   /**
@@ -124,19 +132,17 @@ export default class Screenshots extends Events {
     const displays = getAllDisplays();
 
     const captures = await Promise.all(
-      displays.map((display) => this.capture(display)
-        .then((url) => ({ display, url }))
-        .catch((err) => {
+      displays.map(async (display) => {
+        try {
+          // 并行执行截图和窗口显示
+          const [url] = await Promise.all([
+            this.capture(display),
+            this.createWindow(display, true),
+          ]);
+          return { display, url };
+        } catch (err) {
           this.logger(`Failed to capture display ${display.id}:`, err);
           return null;
-        })),
-    );
-
-    // 等待所有窗口创建完成
-    await Promise.all(
-      captures.map(async (cap) => {
-        if (cap) {
-          await this.createWindow(cap.display);
         }
       }),
     );
@@ -262,7 +268,7 @@ export default class Screenshots extends Events {
   /**
    * 初始化窗口
    */
-  private async createWindow(display: Display): Promise<void> {
+  private async createWindow(display: Display, show: boolean = true): Promise<void> {
     // 重置截图区域
     await this.reset();
 
@@ -399,27 +405,30 @@ export default class Screenshots extends Events {
       view.webContents.once('did-finish-load', () => {
         this.logger('UI loaded successfully');
         win!.setBrowserView(view!);
-        win!.show();
 
-        // 先获得焦点，再启用 kiosk 模式
-        win!.focus();
-        win!.moveTop();
+        if (show) {
+          win!.show();
 
-        // 延迟启用 kiosk 模式，确保焦点已获得
-        setTimeout(() => {
-          // 重新设置 BrowserView 的 bounds，确保正确
-          view!.setBounds({
-            x: 0,
-            y: 0,
-            width: display.width,
-            height: display.height,
-          });
+          // 先获得焦点，再启用 kiosk 模式
+          win!.focus();
+          win!.moveTop();
 
-          win!.setKiosk(true);
-          win!.focus(); // 再次确保窗口焦点
-          view!.webContents.focus(); // 再次确保BrowserView焦点
-          this.logger('Window focused, moved to top, and kiosk enabled');
-        }, 100);
+          // 延迟启用 kiosk 模式，确保焦点已获得
+          setTimeout(() => {
+            // 重新设置 BrowserView 的 bounds，确保正确
+            view!.setBounds({
+              x: 0,
+              y: 0,
+              width: display.width,
+              height: display.height,
+            });
+
+            win!.setKiosk(true);
+            win!.focus(); // 再次确保窗口焦点
+            view!.webContents.focus(); // 再次确保BrowserView焦点
+            this.logger('Window focused, moved to top, and kiosk enabled');
+          }, 100);
+        }
 
         // 开启开发者工具查看错误（暂时关闭以测试焦点问题）
         // view!.webContents.openDevTools();
@@ -478,25 +487,28 @@ export default class Screenshots extends Events {
     } else {
       // 已有 view，直接绑定并显示窗口
       win.setBrowserView(view!);
-      win.show();
-      win.focus();
-      win.moveTop();
 
-      // 延迟启用 kiosk 模式
-      setTimeout(() => {
-        // 重新设置 BrowserView 的 bounds，确保正确
-        view!.setBounds({
-          x: 0,
-          y: 0,
-          width: display.width,
-          height: display.height,
-        });
+      if (show) {
+        win.show();
+        win.focus();
+        win.moveTop();
 
-        win!.setKiosk(true);
-        win!.focus();
-        view!.webContents.focus(); // 确保BrowserView的webContents也获得焦点
-        this.logger('Reused window focused, moved to top, and kiosk enabled');
-      }, 100);
+        // 延迟启用 kiosk 模式
+        setTimeout(() => {
+          // 重新设置 BrowserView 的 bounds，确保正确
+          view!.setBounds({
+            x: 0,
+            y: 0,
+            width: display.width,
+            height: display.height,
+          });
+
+          win!.setKiosk(true);
+          win!.focus();
+          view!.webContents.focus(); // 确保BrowserView的webContents也获得焦点
+          this.logger('Reused window focused, moved to top, and kiosk enabled');
+        }, 100);
+      }
     }
 
     // 适定平台
@@ -538,7 +550,7 @@ export default class Screenshots extends Events {
     this.logger('SCREENSHOTS:capture');
 
     try {
-      const { Monitor } = await import('node-screenshots');
+      // Monitor is now statically imported
       const monitor = Monitor.fromPoint(
         display.x + display.width / 2,
         display.y + display.height / 2,
