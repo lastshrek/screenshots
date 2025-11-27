@@ -11,6 +11,7 @@ import {
 import Events from 'events';
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
 import Event from './event';
 import { Display, getAllDisplays } from './getDisplay';
 import padStart from './padStart';
@@ -436,7 +437,23 @@ export default class Screenshots extends Events {
 
       const image = await monitor.captureImage();
       const buffer = await image.toPng(true);
-      return `data:image/png;base64,${buffer.toString('base64')}`;
+
+      // 保存到临时文件避免IPC传输大数据导致崩溃
+      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+      await fs.ensureDir(tempDir);
+      const tempFile = path.join(
+        tempDir,
+        `screenshot-${display.id}-${Date.now()}.png`,
+      );
+      await fs.writeFile(tempFile, buffer);
+      this.logger(
+        'Screenshot saved to temp file:',
+        tempFile,
+        'size:',
+        buffer.length,
+      );
+
+      return `file://${tempFile}`;
     } catch (err) {
       this.logger('SCREENSHOTS:capture Monitor capture() error %o', err);
 
@@ -470,7 +487,23 @@ export default class Screenshots extends Events {
         throw new Error("Can't find screen source");
       }
 
-      return source.thumbnail.toDataURL();
+      // 保存到临时文件避免IPC传输大数据导致崩溃
+      const pngBuffer = source.thumbnail.toPNG();
+      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+      await fs.ensureDir(tempDir);
+      const tempFile = path.join(
+        tempDir,
+        `screenshot-${display.id}-${Date.now()}.png`,
+      );
+      await fs.writeFile(tempFile, pngBuffer);
+      this.logger(
+        'Screenshot saved to temp file (desktopCapturer):',
+        tempFile,
+        'size:',
+        pngBuffer.length,
+      );
+
+      return `file://${tempFile}`;
     }
   }
 

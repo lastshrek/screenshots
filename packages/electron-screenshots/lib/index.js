@@ -90,6 +90,7 @@ var electron_1 = require("electron");
 var events_1 = __importDefault(require("events"));
 var fs_extra_1 = __importDefault(require("fs-extra"));
 var path_1 = __importDefault(require("path"));
+var os_1 = __importDefault(require("os"));
 var event_1 = __importDefault(require("./event"));
 var getDisplay_1 = require("./getDisplay");
 var padStart_1 = __importDefault(require("./padStart"));
@@ -449,14 +450,14 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var Monitor, monitor, image, buffer, err_1, sources, source;
+            var Monitor, monitor, image, buffer, tempDir, tempFile, err_1, sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         this.logger('SCREENSHOTS:capture');
                         _a.label = 1;
                     case 1:
-                        _a.trys.push([1, 5, , 7]);
+                        _a.trys.push([1, 7, , 11]);
                         return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('node-screenshots')); })];
                     case 2:
                         Monitor = (_a.sent()).Monitor;
@@ -483,8 +484,17 @@ var Screenshots = /** @class */ (function (_super) {
                         return [4 /*yield*/, image.toPng(true)];
                     case 4:
                         buffer = _a.sent();
-                        return [2 /*return*/, "data:image/png;base64,".concat(buffer.toString('base64'))];
+                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                        return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
                     case 5:
+                        _a.sent();
+                        tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
+                        return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, buffer)];
+                    case 6:
+                        _a.sent();
+                        this.logger('Screenshot saved to temp file:', tempFile, 'size:', buffer.length);
+                        return [2 /*return*/, "file://".concat(tempFile)];
+                    case 7:
                         err_1 = _a.sent();
                         this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_1);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
@@ -494,7 +504,7 @@ var Screenshots = /** @class */ (function (_super) {
                                     height: display.height * display.scaleFactor,
                                 },
                             })];
-                    case 6:
+                    case 8:
                         sources = _a.sent();
                         source = void 0;
                         // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
@@ -511,8 +521,18 @@ var Screenshots = /** @class */ (function (_super) {
                             this.logger("SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o", sources, display);
                             throw new Error("Can't find screen source");
                         }
-                        return [2 /*return*/, source.thumbnail.toDataURL()];
-                    case 7: return [2 /*return*/];
+                        pngBuffer = source.thumbnail.toPNG();
+                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                        return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
+                    case 9:
+                        _a.sent();
+                        tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
+                        return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, pngBuffer)];
+                    case 10:
+                        _a.sent();
+                        this.logger('Screenshot saved to temp file (desktopCapturer):', tempFile, 'size:', pngBuffer.length);
+                        return [2 /*return*/, "file://".concat(tempFile)];
+                    case 11: return [2 /*return*/];
                 }
             });
         });
