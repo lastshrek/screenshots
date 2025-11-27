@@ -360,12 +360,17 @@ var Screenshots = /** @class */ (function (_super) {
                             }
                             this.logger('Loading UI from:', htmlPath);
                             // 监听加载失败
-                            view.webContents.on('did-fail-load', function (event, errorCode, errorDescription) {
-                                _this.logger('UI failed to load:', errorCode, errorDescription);
+                            view.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL) {
+                                _this.logger('UI failed to load:', errorCode, errorDescription, validatedURL);
                             });
-                            // 监听控制台消息
-                            view.webContents.on('console-message', function (event, level, message) {
-                                _this.logger("UI Console [".concat(level, "]:"), message);
+                            // 监听资源加载失败
+                            view.webContents.session.webRequest.onErrorOccurred(function (details) {
+                                _this.logger('Resource load error:', details.url, details.error);
+                            });
+                            // 监听控制台消息 (0=log, 1=info, 2=warn, 3=error)
+                            view.webContents.on('console-message', function (event, level, message, line, sourceId) {
+                                var levelNames = ['log', 'info', 'warn', 'error'];
+                                _this.logger("UI Console [".concat(levelNames[level] || level, "]:"), message, line > 0 ? "(".concat(sourceId, ":").concat(line, ")") : '');
                             });
                             view.webContents.loadURL("file://".concat(htmlPath));
                             // 等待 UI 加载完成后再把 view 加到窗口并显示

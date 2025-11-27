@@ -283,15 +283,33 @@ export default class Screenshots extends Events {
       // 监听加载失败
       view.webContents.on(
         'did-fail-load',
-        (event, errorCode, errorDescription) => {
-          this.logger('UI failed to load:', errorCode, errorDescription);
+        (event, errorCode, errorDescription, validatedURL) => {
+          this.logger(
+            'UI failed to load:',
+            errorCode,
+            errorDescription,
+            validatedURL,
+          );
         },
       );
 
-      // 监听控制台消息
-      view.webContents.on('console-message', (event, level, message) => {
-        this.logger(`UI Console [${level}]:`, message);
+      // 监听资源加载失败
+      view.webContents.session.webRequest.onErrorOccurred((details) => {
+        this.logger('Resource load error:', details.url, details.error);
       });
+
+      // 监听控制台消息 (0=log, 1=info, 2=warn, 3=error)
+      view.webContents.on(
+        'console-message',
+        (event, level, message, line, sourceId) => {
+          const levelNames = ['log', 'info', 'warn', 'error'];
+          this.logger(
+            `UI Console [${levelNames[level] || level}]:`,
+            message,
+            line > 0 ? `(${sourceId}:${line})` : '',
+          );
+        },
+      );
 
       view.webContents.loadURL(`file://${htmlPath}`);
       // 等待 UI 加载完成后再把 view 加到窗口并显示
