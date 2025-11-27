@@ -138,7 +138,14 @@ export default class Screenshots extends Events {
 
     // 注册全局 ESC 快捷键，确保能退出
     globalShortcut.register('Esc', () => {
-      this.logger('Global ESC pressed, ending capture');
+      this.logger('Global ESC pressed, canceling capture');
+
+      // 触发 cancel 事件，和 IPC 处理保持一致
+      const event = new Event();
+      this.emit('cancel', event);
+      if (event.defaultPrevented) {
+        return;
+      }
       this.endCapture();
     });
 

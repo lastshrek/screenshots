@@ -184,7 +184,13 @@ var Screenshots = /** @class */ (function (_super) {
                         this.isReady = this.createReadyPromise();
                         // 注册全局 ESC 快捷键，确保能退出
                         electron_1.globalShortcut.register('Esc', function () {
-                            _this.logger('Global ESC pressed, ending capture');
+                            _this.logger('Global ESC pressed, canceling capture');
+                            // 触发 cancel 事件，和 IPC 处理保持一致
+                            var event = new event_1.default();
+                            _this.emit('cancel', event);
+                            if (event.defaultPrevented) {
+                                return;
+                            }
                             _this.endCapture();
                         });
                         displays = (0, getDisplay_1.getAllDisplays)();
