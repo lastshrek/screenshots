@@ -251,31 +251,24 @@ var Screenshots = /** @class */ (function (_super) {
                                     if (win.isDestroyed()) {
                                         return;
                                     }
-                                    if (view && !view.webContents.isDestroyed()) {
+                                    if (view) {
                                         try {
                                             win.removeBrowserView(view);
                                         }
-                                        catch (err) {
-                                            _this.logger('removeBrowserView failed:', err);
+                                        catch (e) {
+                                            // ignore
                                         }
                                     }
-                                    if (_this.singleWindow) {
-                                        win.hide();
-                                        // this.logger('endCapture: window hidden', id);
-                                    }
-                                    else {
-                                        win.destroy();
-                                    }
+                                    // 强制销毁窗口，确保下一次是全新的环境
+                                    win.destroy();
                                 }, 400); // 增加延迟到 400ms
                             }
                         });
-                        if (!this.singleWindow) {
-                            // 如果不是单窗口模式，延迟清理引用
-                            setTimeout(function () {
-                                _this.$wins.clear();
-                                _this.$views.clear();
-                            }, 200);
-                        }
+                        // 总是清理引用，确保下次重新创建
+                        setTimeout(function () {
+                            _this.$wins.clear();
+                            _this.$views.clear();
+                        }, 400);
                         // 清理本次截图产生的临时文件
                         this.cleanupCurrentTempFiles();
                         return [2 /*return*/];
