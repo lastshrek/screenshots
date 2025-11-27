@@ -57,6 +57,10 @@ app.on("window-all-closed", () => {
 });
 ```
 
+### Options
+
+- `kiosk`：默认 `true`。启用后截图窗口会以 kiosk 模式覆盖整个屏幕，但在多窗口项目中可能导致其它 `BrowserWindow` 被系统隐藏。若遇到窗口消失的问题，可以将该选项设置为 `false`。
+
 ### 注意
 
 - 如果使用了 webpack 打包主进程，请在主进程 webpack 配置中修改如下配置，否则可能会出现不能调用截图窗口的情况

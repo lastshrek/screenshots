@@ -40,6 +40,12 @@ export interface ScreenshotsOpts {
   lang?: Lang;
   logger?: Logger;
   singleWindow?: boolean;
+  /**
+   * 是否启用 kiosk 模式。kiosk 会强制应用进入单窗口全屏，
+   * 在多窗口项目中可能导致其它窗口被系统隐藏。
+   * 默认开启以保持历史行为。
+   */
+  kiosk?: boolean;
 }
 
 export { Bounds };
@@ -56,6 +62,8 @@ export default class Screenshots extends Events {
   private logger: Logger;
 
   private singleWindow: boolean;
+
+  private useKiosk: boolean;
 
   private isReady = new Promise<void>((resolve) => {
     ipcMain.once('SCREENSHOTS:ready', () => {
@@ -74,6 +82,7 @@ export default class Screenshots extends Events {
         console.log('[electron-screenshots]', ...args);
       });
     this.singleWindow = opts?.singleWindow ?? true; // Default to true for performance
+    this.useKiosk = opts?.kiosk ?? true;
     this.listenIpc();
     if (opts?.lang) {
       this.setLang(opts.lang);
@@ -163,7 +172,9 @@ export default class Screenshots extends Events {
       const view = this.$views.get(id);
       if (win && !win.isDestroyed()) {
         // this.logger('endCapture: restoring window state', id);
-        win.setKiosk(false);
+        if (win.isKiosk()) {
+          win.setKiosk(false);
+        }
         // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
         // win.blur(); // 移除 blur，避免干扰 Dock 栏恢复
         win.blurWebView();
@@ -411,7 +422,9 @@ export default class Screenshots extends Events {
               height: display.height,
             });
 
-            win!.setKiosk(true);
+            if (this.shouldUseKiosk()) {
+              win!.setKiosk(true);
+            }
             win!.focus(); // 再次确保窗口焦点
             view!.webContents.focus(); // 再次确保BrowserView焦点
             // this.logger('Window focused, moved to top, and kiosk enabled');
@@ -440,7 +453,9 @@ export default class Screenshots extends Events {
             height: display.height,
           });
 
-          win!.setKiosk(true);
+          if (this.shouldUseKiosk()) {
+            win!.setKiosk(true);
+          }
           win!.focus();
           view!.webContents.focus(); // 确保BrowserView的webContents也获得焦点
           // this.logger('Reused window focused, moved to top, and kiosk enabled');
@@ -690,5 +705,28 @@ export default class Screenshots extends Events {
         this.endCapture();
       },
     );
+  }
+
+  /**
+   * kiosk 模式会让整个应用进入“单窗口”全屏。
+   * 对于存在其他 BrowserWindow 的项目，在开启截图时会把它们隐藏，
+   * 因此需要在检测到其他窗口存在时跳过 kiosk。
+   */
+  private shouldUseKiosk(): boolean {
+    if (!this.useKiosk) {
+      return false;
+    }
+
+    const screenshotWins = new Set(this.$wins.values());
+    const hasExternalWindows = BrowserWindow.getAllWindows().some(
+      (win) => !screenshotWins.has(win),
+    );
+
+    if (hasExternalWindows) {
+      this.logger('Skipping kiosk mode: other app windows detected.');
+      return false;
+    }
+
+    return true;
   }
 }
