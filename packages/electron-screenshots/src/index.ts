@@ -8,6 +8,7 @@ import {
   globalShortcut,
   ipcMain,
   nativeImage,
+  systemPreferences,
 } from 'electron';
 import Events from 'events';
 import fs from 'fs-extra';
@@ -128,10 +129,32 @@ export default class Screenshots extends Events {
   }
 
   /**
+   * 检查屏幕录制权限
+   */
+  private checkScreenRecordingPermission(): boolean {
+    if (process.platform !== 'darwin') {
+      // 非 macOS 平台不需要检查
+      return true;
+    }
+
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    this.logger('Screen recording permission status:', status);
+    return status === 'granted';
+  }
+
+  /**
    * 开始截图
    */
   public async startCapture(): Promise<void> {
     this.logger('startCapture');
+
+    // 检查屏幕录制权限（仅 macOS）
+    if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
+      this.logger('Screen recording permission not granted');
+      throw new Error(
+        'Screen recording permission is required. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.',
+      );
+    }
 
     // 重置 isReady Promise，确保等待新的窗口 ready 事件
     this.isReady = this.createReadyPromise();

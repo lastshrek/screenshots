@@ -170,6 +170,18 @@ var Screenshots = /** @class */ (function (_super) {
         });
     };
     /**
+     * 检查屏幕录制权限
+     */
+    Screenshots.prototype.checkScreenRecordingPermission = function () {
+        if (process.platform !== 'darwin') {
+            // 非 macOS 平台不需要检查
+            return true;
+        }
+        var status = electron_1.systemPreferences.getMediaAccessStatus('screen');
+        this.logger('Screen recording permission status:', status);
+        return status === 'granted';
+    };
+    /**
      * 开始截图
      */
     Screenshots.prototype.startCapture = function () {
@@ -180,6 +192,11 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.logger('startCapture');
+                        // 检查屏幕录制权限（仅 macOS）
+                        if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
+                            this.logger('Screen recording permission not granted');
+                            throw new Error('Screen recording permission is required. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.');
+                        }
                         // 重置 isReady Promise，确保等待新的窗口 ready 事件
                         this.isReady = this.createReadyPromise();
                         // 注册全局 ESC 快捷键，确保能退出

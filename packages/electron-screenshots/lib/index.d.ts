@@ -46,6 +46,10 @@ export default class Screenshots extends Events {
      */
     private cleanupOldTempFiles;
     /**
+     * 检查屏幕录制权限
+     */
+    private checkScreenRecordingPermission;
+    /**
      * 开始截图
      */
     startCapture(): Promise<void>;
