@@ -229,11 +229,16 @@ var Screenshots = /** @class */ (function (_super) {
                     case 2:
                         // 窗口已预加载,React 应用已 ready,直接发送数据
                         _a.sent(); // 确保应用已初始化
-                        this.logger('Sending screenshot data to all displays...');
+                        // this.logger('Sending screenshot data to all displays...');
                         captures.forEach(function (cap) {
                             if (cap) {
                                 var view = _this.$views.get(cap.display.id);
-                                _this.logger('Sending screenshot data to display', cap.display.id, 'url length:', cap.url.length);
+                                // this.logger(
+                                //   'Sending screenshot data to display',
+                                //   cap.display.id,
+                                //   'url length:',
+                                //   cap.url.length,
+                                // );
                                 view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
                             }
                         });
@@ -259,8 +264,10 @@ var Screenshots = /** @class */ (function (_super) {
                         this.$wins.forEach(function (win, id) {
                             var view = _this.$views.get(id);
                             if (win && !win.isDestroyed()) {
+                                // this.logger('endCapture: restoring window state', id);
                                 win.setKiosk(false);
-                                win.blur(); // 保持 blur 以确保失去焦点
+                                // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
+                                win.blur();
                                 win.blurWebView();
                                 win.unmaximize();
                                 // 延迟隐藏窗口，等待 macOS 动画/状态更新完成
@@ -271,6 +278,7 @@ var Screenshots = /** @class */ (function (_super) {
                                     }
                                     if (_this.singleWindow) {
                                         win.hide();
+                                        // this.logger('endCapture: window hidden', id);
                                     }
                                     else {
                                         win.destroy();
@@ -514,7 +522,9 @@ var Screenshots = /** @class */ (function (_super) {
                                         win.setKiosk(true);
                                         win.focus(); // 再次确保窗口焦点
                                         view.webContents.focus(); // 再次确保BrowserView焦点
-                                        _this.logger('Window focused, moved to top, and kiosk enabled');
+                                        // this.logger('Window focused, moved to top, and kiosk enabled');
+                                        // 诊断焦点状态
+                                        // console.log('DEBUG: Window isFocused:', win!.isFocused());
                                     }, 100);
                                 }
                             });
@@ -538,7 +548,9 @@ var Screenshots = /** @class */ (function (_super) {
                                     win.setKiosk(true);
                                     win.focus();
                                     view.webContents.focus(); // 确保BrowserView的webContents也获得焦点
-                                    _this.logger('Reused window focused, moved to top, and kiosk enabled');
+                                    // this.logger('Reused window focused, moved to top, and kiosk enabled');
+                                    // 诊断焦点状态
+                                    // console.log('DEBUG: Reused Window isFocused:', win!.isFocused());
                                 }, 100);
                             }
                         }

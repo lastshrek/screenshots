@@ -153,16 +153,16 @@ export default class Screenshots extends Events {
 
     // 窗口已预加载,React 应用已 ready,直接发送数据
     await this.isReady; // 确保应用已初始化
-    this.logger('Sending screenshot data to all displays...');
+    // this.logger('Sending screenshot data to all displays...');
     captures.forEach((cap) => {
       if (cap) {
         const view = this.$views.get(cap.display.id);
-        this.logger(
-          'Sending screenshot data to display',
-          cap.display.id,
-          'url length:',
-          cap.url.length,
-        );
+        // this.logger(
+        //   'Sending screenshot data to display',
+        //   cap.display.id,
+        //   'url length:',
+        //   cap.url.length,
+        // );
         view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
       }
     });
@@ -179,8 +179,10 @@ export default class Screenshots extends Events {
     this.$wins.forEach((win, id) => {
       const view = this.$views.get(id);
       if (win && !win.isDestroyed()) {
+        // this.logger('endCapture: restoring window state', id);
         win.setKiosk(false);
-        win.blur(); // 保持 blur 以确保失去焦点
+        // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
+        win.blur();
         win.blurWebView();
         win.unmaximize();
 
@@ -193,6 +195,7 @@ export default class Screenshots extends Events {
 
           if (this.singleWindow) {
             win.hide();
+            // this.logger('endCapture: window hidden', id);
           } else {
             win.destroy();
           }
@@ -428,7 +431,10 @@ export default class Screenshots extends Events {
             win!.setKiosk(true);
             win!.focus(); // 再次确保窗口焦点
             view!.webContents.focus(); // 再次确保BrowserView焦点
-            this.logger('Window focused, moved to top, and kiosk enabled');
+            // this.logger('Window focused, moved to top, and kiosk enabled');
+
+            // 诊断焦点状态
+            // console.log('DEBUG: Window isFocused:', win!.isFocused());
           }, 100);
         }
       });
@@ -454,7 +460,10 @@ export default class Screenshots extends Events {
           win!.setKiosk(true);
           win!.focus();
           view!.webContents.focus(); // 确保BrowserView的webContents也获得焦点
-          this.logger('Reused window focused, moved to top, and kiosk enabled');
+          // this.logger('Reused window focused, moved to top, and kiosk enabled');
+
+          // 诊断焦点状态
+          // console.log('DEBUG: Reused Window isFocused:', win!.isFocused());
         }, 100);
       }
     }
