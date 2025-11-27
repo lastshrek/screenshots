@@ -380,6 +380,17 @@ var Screenshots = /** @class */ (function (_super) {
                                 win.show();
                                 // 开启开发者工具查看错误
                                 view.webContents.openDevTools();
+                                // 延迟检查DOM是否正确渲染
+                                setTimeout(function () {
+                                    view.webContents
+                                        .executeJavaScript("\n            const app = document.getElementById('app');\n            const result = {\n              appExists: !!app,\n              appHasChildren: app ? app.children.length > 0 : false,\n              appInnerHTML: app ? app.innerHTML.substring(0, 200) : 'no app element',\n              bodyChildren: document.body.children.length,\n              scriptsCount: document.querySelectorAll('script').length,\n              hasReact: typeof window.React !== 'undefined'\n            };\n            console.log('DOM Check:', JSON.stringify(result, null, 2));\n            result;\n          ")
+                                        .then(function (result) {
+                                        _this.logger('DOM Check Result:', result);
+                                    })
+                                        .catch(function (err) {
+                                        _this.logger('DOM Check Error:', err);
+                                    });
+                                }, 1000);
                             });
                         }
                         else {

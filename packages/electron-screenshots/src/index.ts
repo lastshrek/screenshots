@@ -320,6 +320,32 @@ export default class Screenshots extends Events {
 
         // 开启开发者工具查看错误
         view!.webContents.openDevTools();
+
+        // 延迟检查DOM是否正确渲染
+        setTimeout(() => {
+          view!.webContents
+            .executeJavaScript(
+              `
+            const app = document.getElementById('app');
+            const result = {
+              appExists: !!app,
+              appHasChildren: app ? app.children.length > 0 : false,
+              appInnerHTML: app ? app.innerHTML.substring(0, 200) : 'no app element',
+              bodyChildren: document.body.children.length,
+              scriptsCount: document.querySelectorAll('script').length,
+              hasReact: typeof window.React !== 'undefined'
+            };
+            console.log('DOM Check:', JSON.stringify(result, null, 2));
+            result;
+          `,
+            )
+            .then((result: any) => {
+              this.logger('DOM Check Result:', result);
+            })
+            .catch((err: any) => {
+              this.logger('DOM Check Error:', err);
+            });
+        }, 1000);
       });
     } else {
       // 已有 view，直接绑定并显示窗口
