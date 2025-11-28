@@ -458,7 +458,8 @@ var Screenshots = /** @class */ (function (_super) {
                                 // linux 必须设置为 undefined，否则会在部分系统上不能触发focus 事件
                                 // https://github.com/nashaofu/screenshots/issues/203#issuecomment-1518923486
                                 linux: undefined,
-                                win32: 'toolbar',
+                                // win32: 'toolbar', // 移除 toolbar 类型，使用默认类型以避免全屏窗口层级问题
+                                win32: undefined,
                             };
                             win = new electron_1.BrowserWindow({
                                 title: 'screenshots',
