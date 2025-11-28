@@ -189,7 +189,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.startCapture = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var displays, captures, readyPromises;
+            var displays, captures, readyPromises, cursorPoint, display, focusWin;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -278,6 +278,13 @@ var Screenshots = /** @class */ (function (_super) {
                                 win.moveTop();
                             }
                         });
+                        cursorPoint = electron_1.screen.getCursorScreenPoint();
+                        display = electron_1.screen.getDisplayNearestPoint(cursorPoint);
+                        focusWin = this.$wins.get(display.id);
+                        if (focusWin && !focusWin.isDestroyed()) {
+                            this.logger("Focusing window for display ".concat(display.id, " (mouse at ").concat(cursorPoint.x, ", ").concat(cursorPoint.y, ")"));
+                            focusWin.focus();
+                        }
                         // 发送数据
                         captures.forEach(function (cap) {
                             if (cap) {

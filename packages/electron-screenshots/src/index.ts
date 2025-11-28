@@ -8,6 +8,7 @@ import {
   globalShortcut,
   ipcMain,
   nativeImage,
+  screen,
   systemPreferences,
 } from 'electron';
 import Events from 'events';
@@ -234,6 +235,15 @@ export default class Screenshots extends Events {
         win.moveTop();
       }
     });
+
+    // 根据鼠标位置设置初始焦点
+    const cursorPoint = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPoint);
+    const focusWin = this.$wins.get(display.id);
+    if (focusWin && !focusWin.isDestroyed()) {
+      this.logger(`Focusing window for display ${display.id} (mouse at ${cursorPoint.x}, ${cursorPoint.y})`);
+      focusWin.focus();
+    }
 
     // 发送数据
     captures.forEach((cap) => {
