@@ -250,7 +250,11 @@ export default class Screenshots extends Events {
       if (cap) {
         const view = this.$views.get(cap.display.id);
         this.logger(`Sending screenshot data to display ${cap.display.id}`);
-        view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+        // 添加短暂延迟，确保渲染进程已完全激活并准备好接收数据
+        // 这有助于解决在某些情况下（如窗口刚获得焦点）数据丢失的问题
+        setTimeout(() => {
+          view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+        }, 100);
       }
     });
   }

@@ -288,9 +288,13 @@ var Screenshots = /** @class */ (function (_super) {
                         // 发送数据
                         captures.forEach(function (cap) {
                             if (cap) {
-                                var view = _this.$views.get(cap.display.id);
+                                var view_1 = _this.$views.get(cap.display.id);
                                 _this.logger("Sending screenshot data to display ".concat(cap.display.id));
-                                view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+                                // 添加短暂延迟，确保渲染进程已完全激活并准备好接收数据
+                                // 这有助于解决在某些情况下（如窗口刚获得焦点）数据丢失的问题
+                                setTimeout(function () {
+                                    view_1 === null || view_1 === void 0 ? void 0 : view_1.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
+                                }, 100);
                             }
                         });
                         return [2 /*return*/];
