@@ -636,29 +636,44 @@ export default class Screenshots extends Events {
 
     try {
       // Monitor is now statically imported
-      const monitor = Monitor.fromPoint(
-        display.x + display.width / 2,
-        display.y + display.height / 2,
+      // 使用 Monitor.all() 并手动匹配，比 Monitor.fromPoint 更可靠
+      // 特别是在多屏且有 DPI 缩放的情况下
+      const monitors = Monitor.all();
+      let monitor = monitors.find(
+        (m) => Math.abs(m.x - display.x) < 10 && Math.abs(m.y - display.y) < 10,
       );
+
+      // 如果没找到完全匹配的，尝试找中心点匹配
+      if (!monitor) {
+        const centerX = display.x + display.width / 2;
+        const centerY = display.y + display.height / 2;
+        monitor = monitors.find((m) => centerX >= m.x && centerX < m.x + m.width
+          && centerY >= m.y && centerY < m.y + m.height);
+      }
+
+      // 如果还是没找到，回退到 Monitor.fromPoint
+      if (!monitor) {
+        const fromPoint = Monitor.fromPoint(
+          display.x + display.width / 2,
+          display.y + display.height / 2,
+        );
+        if (fromPoint) {
+          monitor = fromPoint;
+        }
+      }
+
       this.logger(
-        'SCREENSHOTS:capture Monitor.fromPoint arguments %o',
-        display,
+        'SCREENSHOTS:capture Match result: display(id=%d, x=%d, y=%d) -> monitor(id=%d, x=%d, y=%d)',
+        display.id,
+        display.x,
+        display.y,
+        monitor?.id,
+        monitor?.x,
+        monitor?.y,
       );
-      this.logger('SCREENSHOTS:capture Monitor.fromPoint return %o', {
-        id: monitor?.id,
-        name: monitor?.name,
-        x: monitor?.x,
-        y: monitor?.y,
-        width: monitor?.width,
-        height: monitor?.height,
-        rotation: monitor?.rotation,
-        scaleFactor: monitor?.scaleFactor,
-        frequency: monitor?.frequency,
-        isPrimary: monitor?.isPrimary,
-      });
 
       if (!monitor) {
-        throw new Error(`Monitor.fromDisplay(${display.id}) get null`);
+        throw new Error(`Monitor match failed for display ${display.id}`);
       }
 
       const image = await monitor.captureImage();

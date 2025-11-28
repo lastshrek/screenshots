@@ -674,7 +674,7 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var monitor, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
+            var monitors, monitor, centerX_1, centerY_1, fromPoint, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -682,22 +682,25 @@ var Screenshots = /** @class */ (function (_super) {
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 6, , 10]);
-                        monitor = node_screenshots_1.Monitor.fromPoint(display.x + display.width / 2, display.y + display.height / 2);
-                        this.logger('SCREENSHOTS:capture Monitor.fromPoint arguments %o', display);
-                        this.logger('SCREENSHOTS:capture Monitor.fromPoint return %o', {
-                            id: monitor === null || monitor === void 0 ? void 0 : monitor.id,
-                            name: monitor === null || monitor === void 0 ? void 0 : monitor.name,
-                            x: monitor === null || monitor === void 0 ? void 0 : monitor.x,
-                            y: monitor === null || monitor === void 0 ? void 0 : monitor.y,
-                            width: monitor === null || monitor === void 0 ? void 0 : monitor.width,
-                            height: monitor === null || monitor === void 0 ? void 0 : monitor.height,
-                            rotation: monitor === null || monitor === void 0 ? void 0 : monitor.rotation,
-                            scaleFactor: monitor === null || monitor === void 0 ? void 0 : monitor.scaleFactor,
-                            frequency: monitor === null || monitor === void 0 ? void 0 : monitor.frequency,
-                            isPrimary: monitor === null || monitor === void 0 ? void 0 : monitor.isPrimary,
-                        });
+                        monitors = node_screenshots_1.Monitor.all();
+                        monitor = monitors.find(function (m) { return Math.abs(m.x - display.x) < 10 && Math.abs(m.y - display.y) < 10; });
+                        // 如果没找到完全匹配的，尝试找中心点匹配
                         if (!monitor) {
-                            throw new Error("Monitor.fromDisplay(".concat(display.id, ") get null"));
+                            centerX_1 = display.x + display.width / 2;
+                            centerY_1 = display.y + display.height / 2;
+                            monitor = monitors.find(function (m) { return centerX_1 >= m.x && centerX_1 < m.x + m.width
+                                && centerY_1 >= m.y && centerY_1 < m.y + m.height; });
+                        }
+                        // 如果还是没找到，回退到 Monitor.fromPoint
+                        if (!monitor) {
+                            fromPoint = node_screenshots_1.Monitor.fromPoint(display.x + display.width / 2, display.y + display.height / 2);
+                            if (fromPoint) {
+                                monitor = fromPoint;
+                            }
+                        }
+                        this.logger('SCREENSHOTS:capture Match result: display(id=%d, x=%d, y=%d) -> monitor(id=%d, x=%d, y=%d)', display.id, display.x, display.y, monitor === null || monitor === void 0 ? void 0 : monitor.id, monitor === null || monitor === void 0 ? void 0 : monitor.x, monitor === null || monitor === void 0 ? void 0 : monitor.y);
+                        if (!monitor) {
+                            throw new Error("Monitor match failed for display ".concat(display.id));
                         }
                         return [4 /*yield*/, monitor.captureImage()];
                     case 2:
