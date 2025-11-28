@@ -485,8 +485,9 @@ var Screenshots = /** @class */ (function (_super) {
                                 /**
                                  * linux 下必须设置为false，否则不能全屏显示在最上层
                                  * mac 下设置为false，否则可能会导致程序坞不恢复问题，且与 kiosk 模式冲突
+                                 * win32 下强制全屏，以解决最大化窗口遮挡问题
                                  */
-                                fullscreen: false,
+                                fullscreen: process.platform === 'win32',
                                 // mac fullscreenable 设置为 true 会导致应用崩溃
                                 fullscreenable: false,
                                 kiosk: false,
