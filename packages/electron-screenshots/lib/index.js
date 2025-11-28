@@ -189,7 +189,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.startCapture = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var displays, captures;
+            var displays, captures, readyPromises;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -241,15 +241,41 @@ var Screenshots = /** @class */ (function (_super) {
                     case 2:
                         // 截图完成后，再创建/显示窗口
                         _a.sent();
-                        // 等待 React 应用 ready
-                        return [4 /*yield*/, this.isReady];
+                        readyPromises = captures
+                            .filter(function (cap) { return cap !== null; })
+                            .map(function (cap) { return new Promise(function (resolve) {
+                            var displayId = cap.display.id;
+                            var checkReady = function () {
+                                var view = _this.$views.get(displayId);
+                                if (view && !view.webContents.isDestroyed()) {
+                                    // 检查 webContents 是否已经加载完成
+                                    if (view.webContents.getURL()) {
+                                        _this.logger("Display ".concat(displayId, " is ready"));
+                                        resolve();
+                                    }
+                                    else {
+                                        // 如果还没加载完，等待一下再检查
+                                        setTimeout(checkReady, 50);
+                                    }
+                                }
+                                else {
+                                    // 如果 view 不存在或已销毁，也 resolve（避免卡住）
+                                    _this.logger("Display ".concat(displayId, " view not found or destroyed"));
+                                    resolve();
+                                }
+                            };
+                            checkReady();
+                        }); });
+                        this.logger("Waiting for ".concat(readyPromises.length, " displays to be ready..."));
+                        return [4 /*yield*/, Promise.all(readyPromises)];
                     case 3:
-                        // 等待 React 应用 ready
                         _a.sent();
+                        this.logger('All displays are ready');
                         // 发送数据
                         captures.forEach(function (cap) {
                             if (cap) {
                                 var view = _this.$views.get(cap.display.id);
+                                _this.logger("Sending screenshot data to display ".concat(cap.display.id));
                                 view === null || view === void 0 ? void 0 : view.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
                             }
                         });

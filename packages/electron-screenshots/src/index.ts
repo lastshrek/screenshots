@@ -197,13 +197,41 @@ export default class Screenshots extends Events {
       }),
     );
 
-    // 等待 React 应用 ready
-    await this.isReady;
+    // 等待所有窗口的 React 应用 ready
+    // 为每个窗口创建一个独立的 ready promise
+    const readyPromises = captures
+      .filter((cap) => cap !== null)
+      .map((cap) => new Promise<void>((resolve) => {
+        const displayId = cap!.display.id;
+        const checkReady = () => {
+          const view = this.$views.get(displayId);
+          if (view && !view.webContents.isDestroyed()) {
+            // 检查 webContents 是否已经加载完成
+            if (view.webContents.getURL()) {
+              this.logger(`Display ${displayId} is ready`);
+              resolve();
+            } else {
+              // 如果还没加载完，等待一下再检查
+              setTimeout(checkReady, 50);
+            }
+          } else {
+            // 如果 view 不存在或已销毁，也 resolve（避免卡住）
+            this.logger(`Display ${displayId} view not found or destroyed`);
+            resolve();
+          }
+        };
+        checkReady();
+      }));
+
+    this.logger(`Waiting for ${readyPromises.length} displays to be ready...`);
+    await Promise.all(readyPromises);
+    this.logger('All displays are ready');
 
     // 发送数据
     captures.forEach((cap) => {
       if (cap) {
         const view = this.$views.get(cap.display.id);
+        this.logger(`Sending screenshot data to display ${cap.display.id}`);
         view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
       }
     });
