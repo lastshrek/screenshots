@@ -395,7 +395,8 @@ export default class Screenshots extends Events {
         // mac fullscreenable 设置为 true 会导致应用崩溃
         fullscreenable: false,
         kiosk: false, // 先不启用 kiosk，等窗口显示后再启用
-        backgroundColor: '#00000000',
+        // 使用极低透明度的黑色，防止 Windows 下完全透明导致的鼠标穿透问题
+        backgroundColor: '#00000001',
         titleBarStyle: 'hidden',
         hasShadow: false,
         paintWhenInitiallyHidden: false,

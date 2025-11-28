@@ -488,7 +488,8 @@ var Screenshots = /** @class */ (function (_super) {
                                 // mac fullscreenable 设置为 true 会导致应用崩溃
                                 fullscreenable: false,
                                 kiosk: false,
-                                backgroundColor: '#00000000',
+                                // 使用极低透明度的黑色，防止 Windows 下完全透明导致的鼠标穿透问题
+                                backgroundColor: '#00000001',
                                 titleBarStyle: 'hidden',
                                 hasShadow: false,
                                 paintWhenInitiallyHidden: false,
