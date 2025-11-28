@@ -386,6 +386,7 @@ export default class Screenshots extends Events {
         // focusable 必须设置为 true, 否则窗口不能及时响应esc按键，输入框也不能输入
         focusable: true,
         skipTaskbar: true,
+        // 使用 screen-saver 级别 (2) 确保在 Windows 上覆盖所有窗口（包括任务栏）
         alwaysOnTop: true,
         /**
          * linux 下必须设置为false，否则不能全屏显示在最上层
@@ -491,6 +492,8 @@ export default class Screenshots extends Events {
         if (!didFinishLoadCalled && show) {
           this.logger('WARNING: did-finish-load timeout, forcing window display for display', display.id);
           win!.setBrowserView(view!);
+          // 强制提升窗口层级到最高
+          win!.setAlwaysOnTop(true, 'screen-saver');
           win!.show();
           win!.focus();
           win!.moveTop();
@@ -507,6 +510,8 @@ export default class Screenshots extends Events {
 
         if (show) {
           this.logger('Showing window for display', display.id, 'at', display.x, display.y);
+          // 强制提升窗口层级到最高
+          win!.setAlwaysOnTop(true, 'screen-saver');
           win!.show();
 
           // 先获得焦点，再启用 kiosk 模式
