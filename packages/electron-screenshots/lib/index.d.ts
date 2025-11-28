@@ -35,6 +35,7 @@ export default class Screenshots extends Events {
     $wins: Map<number, BrowserWindow>;
     $views: Map<number, BrowserView>;
     private tempFiles;
+    private usedMonitorIds;
     private logger;
     private singleWindow;
     private useKiosk;

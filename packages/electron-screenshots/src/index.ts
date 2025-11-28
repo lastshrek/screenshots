@@ -62,6 +62,9 @@ export default class Screenshots extends Events {
   // 记录当前使用的临时文件，用于清理
   private tempFiles: Set<string> = new Set();
 
+  // 用于记录已使用的 Monitor ID，防止多屏匹配错误
+  private usedMonitorIds: Set<number> = new Set();
+
   private logger: Logger;
 
   private singleWindow: boolean;
@@ -152,6 +155,7 @@ export default class Screenshots extends Events {
    */
   public async startCapture(): Promise<void> {
     this.logger('startCapture');
+    this.usedMonitorIds.clear(); // 重置已使用的 Monitor ID
 
     // 检查屏幕录制权限（仅 macOS）
     if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
@@ -675,6 +679,18 @@ export default class Screenshots extends Events {
       if (!monitor) {
         throw new Error(`Monitor match failed for display ${display.id}`);
       }
+
+      // 检查 Monitor 是否已经被其他 Display 使用过
+      // 如果多个 Display 匹配到同一个 Monitor，说明匹配逻辑失效（通常发生在多屏缩放不一致时）
+      // 此时应该抛出错误，回退到 desktopCapturer
+      if (this.usedMonitorIds.has(monitor.id)) {
+        this.logger(
+          'WARNING: Monitor %d already used, falling back to desktopCapturer',
+          monitor.id,
+        );
+        throw new Error(`Monitor ${monitor.id} already used`);
+      }
+      this.usedMonitorIds.add(monitor.id);
 
       const image = await monitor.captureImage();
       const buffer = await image.toPng(true);

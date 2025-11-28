@@ -83,6 +83,8 @@ var Screenshots = /** @class */ (function (_super) {
         _this.$views = new Map();
         // 记录当前使用的临时文件，用于清理
         _this.tempFiles = new Set();
+        // 用于记录已使用的 Monitor ID，防止多屏匹配错误
+        _this.usedMonitorIds = new Set();
         // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
         _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger)
             || (function () {
@@ -195,6 +197,7 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.logger('startCapture');
+                        this.usedMonitorIds.clear(); // 重置已使用的 Monitor ID
                         // 检查屏幕录制权限（仅 macOS）
                         if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
                             this.logger('Screen recording permission denied');
@@ -702,6 +705,14 @@ var Screenshots = /** @class */ (function (_super) {
                         if (!monitor) {
                             throw new Error("Monitor match failed for display ".concat(display.id));
                         }
+                        // 检查 Monitor 是否已经被其他 Display 使用过
+                        // 如果多个 Display 匹配到同一个 Monitor，说明匹配逻辑失效（通常发生在多屏缩放不一致时）
+                        // 此时应该抛出错误，回退到 desktopCapturer
+                        if (this.usedMonitorIds.has(monitor.id)) {
+                            this.logger('WARNING: Monitor %d already used, falling back to desktopCapturer', monitor.id);
+                            throw new Error("Monitor ".concat(monitor.id, " already used"));
+                        }
+                        this.usedMonitorIds.add(monitor.id);
                         return [4 /*yield*/, monitor.captureImage()];
                     case 2:
                         image = _a.sent();
