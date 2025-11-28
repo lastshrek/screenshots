@@ -33,6 +33,10 @@ electron_1.contextBridge.exposeInMainWorld('screenshots', {
         console.log('contextBridge ok', arrayBuffer, data);
         electron_1.ipcRenderer.send('SCREENSHOTS:ok', Buffer.from(arrayBuffer), data);
     },
+    moveBounds: function (bounds, globalX, globalY) {
+        console.log('contextBridge moveBounds', bounds, globalX, globalY);
+        electron_1.ipcRenderer.send('SCREENSHOTS:moveBounds', bounds, globalX, globalY);
+    },
     on: function (channel, fn) {
         var _a;
         console.log('contextBridge on', fn);

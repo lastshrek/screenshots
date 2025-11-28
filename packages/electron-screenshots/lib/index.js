@@ -863,6 +863,50 @@ var Screenshots = /** @class */ (function (_super) {
                 }
             });
         }); });
+        /**
+         * MOVE_BOUNDS事件 - 处理跨屏选框移动
+         */
+        electron_1.ipcMain.on('SCREENSHOTS:moveBounds', function (e, bounds, globalX, globalY) {
+            _this.logger('SCREENSHOTS:moveBounds bounds: %o, globalPos: (%d, %d)', bounds, globalX, globalY);
+            // 根据全局坐标找到目标显示器
+            var targetDisplay = electron_1.screen.getDisplayNearestPoint({
+                x: globalX,
+                y: globalY,
+            });
+            // 找到源窗口（发送事件的窗口）
+            var sourceDisplayId;
+            _this.$views.forEach(function (view, id) {
+                if (view.webContents === e.sender) {
+                    sourceDisplayId = id;
+                }
+            });
+            if (!sourceDisplayId) {
+                _this.logger('SCREENSHOTS:moveBounds source display not found');
+                return;
+            }
+            // 如果目标显示器和源显示器相同，不需要处理
+            if (targetDisplay.id === sourceDisplayId) {
+                return;
+            }
+            _this.logger('SCREENSHOTS:moveBounds moving from display %d to %d', sourceDisplayId, targetDisplay.id);
+            // 将选框坐标转换为目标显示器的本地坐标
+            var localBounds = {
+                x: globalX - targetDisplay.bounds.x,
+                y: globalY - targetDisplay.bounds.y,
+                width: bounds.width,
+                height: bounds.height,
+            };
+            // 通知目标显示器的窗口显示选框
+            var targetView = _this.$views.get(targetDisplay.id);
+            if (targetView) {
+                targetView.webContents.send('SCREENSHOTS:syncBounds', localBounds);
+            }
+            // 通知源显示器的窗口隐藏选框
+            var sourceView = _this.$views.get(sourceDisplayId);
+            if (sourceView) {
+                sourceView.webContents.send('SCREENSHOTS:syncBounds', null);
+            }
+        });
     };
     /**
      * kiosk 模式会让整个应用进入“单窗口”全屏。

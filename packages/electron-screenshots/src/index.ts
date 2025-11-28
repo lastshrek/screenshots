@@ -866,6 +866,71 @@ export default class Screenshots extends Events {
         this.endCapture();
       },
     );
+
+    /**
+     * MOVE_BOUNDS事件 - 处理跨屏选框移动
+     */
+    ipcMain.on(
+      'SCREENSHOTS:moveBounds',
+      (e, bounds: Bounds, globalX: number, globalY: number) => {
+        this.logger(
+          'SCREENSHOTS:moveBounds bounds: %o, globalPos: (%d, %d)',
+          bounds,
+          globalX,
+          globalY,
+        );
+
+        // 根据全局坐标找到目标显示器
+        const targetDisplay = screen.getDisplayNearestPoint({
+          x: globalX,
+          y: globalY,
+        });
+
+        // 找到源窗口（发送事件的窗口）
+        let sourceDisplayId: number | undefined;
+        this.$views.forEach((view, id) => {
+          if (view.webContents === e.sender) {
+            sourceDisplayId = id;
+          }
+        });
+
+        if (!sourceDisplayId) {
+          this.logger('SCREENSHOTS:moveBounds source display not found');
+          return;
+        }
+
+        // 如果目标显示器和源显示器相同，不需要处理
+        if (targetDisplay.id === sourceDisplayId) {
+          return;
+        }
+
+        this.logger(
+          'SCREENSHOTS:moveBounds moving from display %d to %d',
+          sourceDisplayId,
+          targetDisplay.id,
+        );
+
+        // 将选框坐标转换为目标显示器的本地坐标
+        const localBounds = {
+          x: globalX - targetDisplay.bounds.x,
+          y: globalY - targetDisplay.bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        };
+
+        // 通知目标显示器的窗口显示选框
+        const targetView = this.$views.get(targetDisplay.id);
+        if (targetView) {
+          targetView.webContents.send('SCREENSHOTS:syncBounds', localBounds);
+        }
+
+        // 通知源显示器的窗口隐藏选框
+        const sourceView = this.$views.get(sourceDisplayId);
+        if (sourceView) {
+          sourceView.webContents.send('SCREENSHOTS:syncBounds', null);
+        }
+      },
+    );
   }
 
   /**

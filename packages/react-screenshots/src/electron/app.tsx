@@ -12,12 +12,13 @@ export interface Display {
   height: number
 }
 
-export default function App (): JSX.Element {
+export default function App(): JSX.Element {
   const [url, setUrl] = useState<string | undefined>(undefined)
   const [width, setWidth] = useState(window.innerWidth)
   const [height, setHeight] = useState(window.innerHeight)
   const [display, setDisplay] = useState<Display | undefined>(undefined)
   const [lang, setLang] = useState<Lang | undefined>(undefined)
+  const [syncedBounds, setSyncedBounds] = useState<Bounds | null>(null)
 
   const onSave = useCallback(
     async (blob: Blob | null, bounds: Bounds) => {
@@ -56,19 +57,26 @@ export default function App (): JSX.Element {
     const onReset = () => {
       setUrl(undefined)
       setDisplay(undefined)
+      setSyncedBounds(null)
       // 确保截图区域被重置
       requestAnimationFrame(() => window.screenshots.reset())
+    }
+
+    const onSyncBounds = (bounds: Bounds | null) => {
+      setSyncedBounds(bounds)
     }
 
     window.screenshots.on('setLang', onSetLang)
     window.screenshots.on('capture', onCapture)
     window.screenshots.on('reset', onReset)
+    window.screenshots.on('syncBounds', onSyncBounds)
     // 告诉主进程页面准备完成
     window.screenshots.ready()
     return () => {
       window.screenshots.off('capture', onCapture)
       window.screenshots.off('setLang', onSetLang)
       window.screenshots.off('reset', onReset)
+      window.screenshots.off('syncBounds', onSyncBounds)
     }
   }, [])
 

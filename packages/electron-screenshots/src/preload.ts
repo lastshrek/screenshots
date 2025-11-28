@@ -48,6 +48,11 @@ contextBridge.exposeInMainWorld('screenshots', {
 
     ipcRenderer.send('SCREENSHOTS:ok', Buffer.from(arrayBuffer), data);
   },
+  moveBounds: (bounds: Bounds, globalX: number, globalY: number) => {
+    console.log('contextBridge moveBounds', bounds, globalX, globalY);
+
+    ipcRenderer.send('SCREENSHOTS:moveBounds', bounds, globalX, globalY);
+  },
   on: (channel: string, fn: ScreenshotsListener) => {
     console.log('contextBridge on', fn);
 
