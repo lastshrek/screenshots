@@ -227,6 +227,14 @@ export default class Screenshots extends Events {
     await Promise.all(readyPromises);
     this.logger('All displays are ready');
 
+    // 发送数据前，再次强制所有窗口置顶，防止被主程序遮挡
+    this.$wins.forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.setAlwaysOnTop(true, 'screen-saver');
+        win.moveTop();
+      }
+    });
+
     // 发送数据
     captures.forEach((cap) => {
       if (cap) {

@@ -271,6 +271,13 @@ var Screenshots = /** @class */ (function (_super) {
                     case 3:
                         _a.sent();
                         this.logger('All displays are ready');
+                        // 发送数据前，再次强制所有窗口置顶，防止被主程序遮挡
+                        this.$wins.forEach(function (win) {
+                            if (win && !win.isDestroyed()) {
+                                win.setAlwaysOnTop(true, 'screen-saver');
+                                win.moveTop();
+                            }
+                        });
                         // 发送数据
                         captures.forEach(function (cap) {
                             if (cap) {
