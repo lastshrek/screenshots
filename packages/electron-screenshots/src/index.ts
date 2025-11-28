@@ -455,12 +455,29 @@ export default class Screenshots extends Events {
       );
 
       view.webContents.loadURL(`file://${htmlPath}`);
+
+      // 添加超时保护，确保窗口最终会显示
+      let didFinishLoadCalled = false;
+      const finishLoadTimeout = setTimeout(() => {
+        if (!didFinishLoadCalled && show) {
+          this.logger('WARNING: did-finish-load timeout, forcing window display for display', display.id);
+          win!.setBrowserView(view!);
+          win!.show();
+          win!.focus();
+          win!.moveTop();
+        }
+      }, 3000); // 3秒超时
+
       // 等待 UI 加载完成后再把 view 加到窗口并显示
       view.webContents.once('did-finish-load', () => {
-        this.logger('UI loaded successfully');
+        didFinishLoadCalled = true;
+        clearTimeout(finishLoadTimeout);
+
+        this.logger('UI loaded successfully for display', display.id);
         win!.setBrowserView(view!);
 
         if (show) {
+          this.logger('Showing window for display', display.id, 'at', display.x, display.y);
           win!.show();
 
           // 先获得焦点，再启用 kiosk 模式

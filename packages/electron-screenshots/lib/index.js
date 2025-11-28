@@ -413,7 +413,7 @@ var Screenshots = /** @class */ (function (_super) {
     Screenshots.prototype.createWindow = function (display, show) {
         if (show === void 0) { show = true; }
         return __awaiter(this, void 0, void 0, function () {
-            var win, view, windowTypes, htmlPath, reactScreenshotsPath;
+            var win, view, windowTypes, htmlPath, reactScreenshotsPath, didFinishLoadCalled_1, finishLoadTimeout_1;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -517,11 +517,24 @@ var Screenshots = /** @class */ (function (_super) {
                                 _this.logger("UI Console [".concat(levelNames[level] || level, "]:"), message, line > 0 ? "(".concat(sourceId, ":").concat(line, ")") : '');
                             });
                             view.webContents.loadURL("file://".concat(htmlPath));
+                            didFinishLoadCalled_1 = false;
+                            finishLoadTimeout_1 = setTimeout(function () {
+                                if (!didFinishLoadCalled_1 && show) {
+                                    _this.logger('WARNING: did-finish-load timeout, forcing window display for display', display.id);
+                                    win.setBrowserView(view);
+                                    win.show();
+                                    win.focus();
+                                    win.moveTop();
+                                }
+                            }, 3000);
                             // 等待 UI 加载完成后再把 view 加到窗口并显示
                             view.webContents.once('did-finish-load', function () {
-                                _this.logger('UI loaded successfully');
+                                didFinishLoadCalled_1 = true;
+                                clearTimeout(finishLoadTimeout_1);
+                                _this.logger('UI loaded successfully for display', display.id);
                                 win.setBrowserView(view);
                                 if (show) {
+                                    _this.logger('Showing window for display', display.id, 'at', display.x, display.y);
                                     win.show();
                                     // 先获得焦点，再启用 kiosk 模式
                                     win.focus();
