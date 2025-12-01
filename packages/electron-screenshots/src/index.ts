@@ -338,17 +338,24 @@ export default class Screenshots extends Events {
       this.preloadedViews.delete(display.id);
       this.preloadReady.delete(display.id);
 
-      // 更新窗口位置并显示
+      // 更新窗口位置
       win.setBounds(display);
       view.setBounds({
         x: 0, y: 0, width: display.width, height: display.height,
       });
-      win.setAlwaysOnTop(true, 'screen-saver');
-      win.show();
-      win.moveTop();
 
-      // 立即发送截图数据
+      // 先发送截图数据，让渲染进程准备好图片
       view.webContents.send('SCREENSHOTS:capture', display, url);
+
+      // 短暂延迟后显示窗口，让渲染进程有时间渲染图片
+      // 这样可以避免看到黑屏/空白窗口
+      setTimeout(() => {
+        if (!win.isDestroyed()) {
+          win.setAlwaysOnTop(true, 'screen-saver');
+          win.show();
+          win.moveTop();
+        }
+      }, 50); // 50ms 足够渲染进程处理图片
 
       this.emit('windowCreated', win);
       win.on('closed', () => {
@@ -421,10 +428,16 @@ export default class Screenshots extends Events {
     view.webContents.loadURL(`file://${htmlPath}`);
 
     view.webContents.once('did-finish-load', () => {
-      win.setAlwaysOnTop(true, 'screen-saver');
-      win.show();
-      win.moveTop();
+      // 先发送截图数据
       view.webContents.send('SCREENSHOTS:capture', display, url);
+      // 延迟显示窗口，等待渲染进程处理图片，避免黑屏闪烁
+      setTimeout(() => {
+        if (!win.isDestroyed()) {
+          win.setAlwaysOnTop(true, 'screen-saver');
+          win.show();
+          win.moveTop();
+        }
+      }, 50);
     });
 
     this.$wins.set(display.id, win);
