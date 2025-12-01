@@ -93,12 +93,12 @@ export default class Screenshots extends Events {
       this.setLang(opts.lang);
     }
 
-    // 清理旧的临时文件
+    // 清理旧的临时文件（异步，不阻塞）
     this.cleanupOldTempFiles();
 
-    // 延迟预加载窗口，避免影响应用启动
+    // 尽快预加载窗口（使用 setImmediate 在当前事件循环结束后立即执行）
     if (this.singleWindow) {
-      setTimeout(() => this.preloadWindows(), 1000);
+      setImmediate(() => this.preloadWindows());
     }
   }
 
@@ -293,27 +293,23 @@ export default class Screenshots extends Events {
 
     const displays = getAllDisplays();
 
-    // 并行执行：截图 + 准备窗口
-    const [captures] = await Promise.all([
-      // 截图
-      Promise.all(
-        displays.map((display) => this.capture(display)
-          .then((url) => ({ display, url }))
-          .catch((err) => {
-            this.logger(`Failed to capture display ${display.id}:`, err);
-            return null;
-          })),
-      ),
+    // 并行执行：批量截图 + 准备窗口
+    const [captureMap] = await Promise.all([
+      // 一次性截取所有屏幕（避免多次调用 desktopCapturer）
+      this.captureAllDisplays(displays),
       // 确保窗口已准备好（如果使用预加载）
       this.singleWindow ? this.ensureWindowsReady(displays) : Promise.resolve(),
     ]);
 
     this.logger(`Capture completed in ${Date.now() - startTime}ms`);
 
-    // 显示窗口并发送数据
-    const validCaptures = captures.filter((cap): cap is NonNullable<typeof cap> => cap !== null);
+    // 构建有效的截图数据
+    const validCaptures = displays
+      .filter((display) => captureMap.has(display.id))
+      .map((display) => ({ display, url: captureMap.get(display.id)! }));
 
-    await Promise.all(validCaptures.map((cap) => this.showWindowWithCapture(cap.display, cap.url)));
+    // 同步显示所有窗口（预加载窗口是同步操作）
+    validCaptures.forEach((cap) => this.showWindowWithCapture(cap.display, cap.url));
 
     // 设置焦点到鼠标所在的显示器
     const cursorPoint = screen.getCursorScreenPoint();
@@ -329,33 +325,29 @@ export default class Screenshots extends Events {
   /**
    * 显示窗口并发送截图数据
    */
-  private async showWindowWithCapture(display: Display, url: string): Promise<void> {
+  private showWindowWithCapture(display: Display, url: string): void {
     // 尝试使用预加载的窗口
     const win = this.preloadedWins.get(display.id);
     const view = this.preloadedViews.get(display.id);
 
     if (win && !win.isDestroyed() && view && this.preloadReady.get(display.id)) {
-      // 使用预加载的窗口
-      this.logger(`Using preloaded window for display ${display.id}`);
+      // 使用预加载的窗口（最快路径）
       this.$wins.set(display.id, win);
       this.$views.set(display.id, view);
       this.preloadedWins.delete(display.id);
       this.preloadedViews.delete(display.id);
       this.preloadReady.delete(display.id);
 
-      // 更新窗口位置（以防显示器配置变化）
+      // 更新窗口位置并显示
       win.setBounds(display);
       view.setBounds({
         x: 0, y: 0, width: display.width, height: display.height,
       });
-
-      // 显示窗口
       win.setAlwaysOnTop(true, 'screen-saver');
       win.show();
-      win.focus();
       win.moveTop();
 
-      // 发送截图数据
+      // 立即发送截图数据
       view.webContents.send('SCREENSHOTS:capture', display, url);
 
       this.emit('windowCreated', win);
@@ -365,21 +357,85 @@ export default class Screenshots extends Events {
         this.$views.delete(display.id);
       });
     } else {
-      // 回退：创建新窗口
+      // 回退：创建新窗口（较慢路径）
       this.logger(`Creating new window for display ${display.id}`);
-      await this.createWindow(display, true);
-      const newView = this.$views.get(display.id);
-      if (newView) {
-        // 等待 UI 加载完成后发送数据
-        if (newView.webContents.getURL()) {
-          newView.webContents.send('SCREENSHOTS:capture', display, url);
-        } else {
-          newView.webContents.once('did-finish-load', () => {
-            newView.webContents.send('SCREENSHOTS:capture', display, url);
-          });
-        }
-      }
+      this.createWindowFast(display, url);
     }
+  }
+
+  /**
+   * 快速创建窗口（简化版，用于回退场景）
+   */
+  private createWindowFast(display: Display, url: string): void {
+    const windowTypes: Record<string, string | undefined> = {
+      darwin: 'panel',
+      linux: undefined,
+      win32: undefined,
+    };
+
+    const win = new BrowserWindow({
+      title: 'screenshots',
+      x: display.x,
+      y: display.y,
+      width: display.width,
+      height: display.height,
+      useContentSize: true,
+      type: windowTypes[process.platform],
+      frame: false,
+      show: false,
+      autoHideMenuBar: true,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      focusable: true,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      fullscreen: false,
+      fullscreenable: false,
+      kiosk: false,
+      backgroundColor: '#00000001',
+      titleBarStyle: 'hidden',
+      hasShadow: false,
+    });
+
+    const view = new BrowserView({
+      webPreferences: {
+        preload: require.resolve('./preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    let htmlPath: string;
+    try {
+      const reactScreenshotsPath = require.resolve('react-screenshots');
+      htmlPath = path.join(path.dirname(reactScreenshotsPath), '../electron/electron.html');
+    } catch (err) {
+      htmlPath = path.join(__dirname, '../../react-screenshots/electron/electron.html');
+    }
+
+    win.setBrowserView(view);
+    view.setBounds({
+      x: 0, y: 0, width: display.width, height: display.height,
+    });
+    view.webContents.loadURL(`file://${htmlPath}`);
+
+    view.webContents.once('did-finish-load', () => {
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.show();
+      win.moveTop();
+      view.webContents.send('SCREENSHOTS:capture', display, url);
+    });
+
+    this.$wins.set(display.id, win);
+    this.$views.set(display.id, view);
+    this.emit('windowCreated', win);
+
+    win.on('closed', () => {
+      this.emit('windowClosed', win);
+      this.$wins.delete(display.id);
+      this.$views.delete(display.id);
+    });
   }
 
   /**
@@ -792,51 +848,49 @@ export default class Screenshots extends Events {
     // win.show() 已在 view 加载完成的回调或已有 view 的 else 分支中处理，无需再次调用
   }
 
-  private async capture(display: Display): Promise<string> {
-    this.logger('SCREENSHOTS:capture display:', display.id);
-    const captureStart = Date.now();
+  // 缓存的截图源，避免多显示器时重复调用 desktopCapturer
+  private cachedSources: Electron.DesktopCapturerSource[] | null = null;
 
-    // 使用 Electron 内置的 desktopCapturer，全平台通用（Win7/10/11、macOS、Linux）
+  private cachedSourcesTime: number = 0;
+
+  /**
+   * 批量获取所有显示器的截图（一次 API 调用）
+   */
+  private async captureAllDisplays(displays: Display[]): Promise<Map<number, string>> {
+    const captureStart = Date.now();
+    const result = new Map<number, string>();
+
+    // 找出最大的屏幕尺寸，用于 thumbnailSize
+    const maxWidth = Math.max(...displays.map((d) => d.width * d.scaleFactor));
+    const maxHeight = Math.max(...displays.map((d) => d.height * d.scaleFactor));
+
+    // 一次性获取所有屏幕截图
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
-      thumbnailSize: {
-        width: display.width * display.scaleFactor,
-        height: display.height * display.scaleFactor,
-      },
+      thumbnailSize: { width: maxWidth, height: maxHeight },
     });
 
-    this.logger(`desktopCapturer.getSources took ${Date.now() - captureStart}ms`);
+    this.logger(`desktopCapturer.getSources took ${Date.now() - captureStart}ms for ${sources.length} sources`);
 
-    let source;
-    // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
-    // 和这里 source 对象上的 display_id(Linux上，这个值是空字符串) 或 id 的中间部分，都不一致
-    // 但是，如果只有一个显示器的话，其实不用判断，直接返回就行
-    if (sources.length === 1) {
-      [source] = sources;
-    } else {
-      source = sources.find(
-        (item) => item.display_id === display.id.toString()
-          || item.id.startsWith(`screen:${display.id}:`),
-      );
-    }
+    // 为每个显示器匹配对应的截图源
+    displays.forEach((display) => {
+      let source;
+      if (sources.length === 1) {
+        [source] = sources;
+      } else {
+        source = sources.find(
+          (item) => item.display_id === display.id.toString()
+            || item.id.startsWith(`screen:${display.id}:`),
+        );
+      }
 
-    if (!source) {
-      this.logger(
-        "SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o",
-        sources,
-        display,
-      );
-      throw new Error("Can't find screen source");
-    }
+      if (source) {
+        result.set(display.id, source.thumbnail.toDataURL());
+      }
+    });
 
-    // 直接使用 Data URL，避免文件 I/O 开销
-    // 对于大多数屏幕分辨率，这比写入临时文件更快
-    const dataUrl = source.thumbnail.toDataURL();
-    this.logger(
-      `Screenshot captured for display ${display.id}, size: ${dataUrl.length}, took ${Date.now() - captureStart}ms`,
-    );
-
-    return dataUrl;
+    this.logger(`All captures completed in ${Date.now() - captureStart}ms`);
+    return result;
   }
 
   /**
