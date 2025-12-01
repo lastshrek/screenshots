@@ -15,7 +15,6 @@ import Events from 'events';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { Monitor } from 'node-screenshots';
 import Event from './event';
 import { Display, getAllDisplays } from './getDisplay';
 import padStart from './padStart';
@@ -61,9 +60,6 @@ export default class Screenshots extends Events {
 
   // 记录当前使用的临时文件，用于清理
   private tempFiles: Set<string> = new Set();
-
-  // 用于记录已使用的 Monitor ID，防止多屏匹配错误
-  private usedMonitorIds: Set<number> = new Set();
 
   private logger: Logger;
 
@@ -155,7 +151,6 @@ export default class Screenshots extends Events {
    */
   public async startCapture(): Promise<void> {
     this.logger('startCapture');
-    this.usedMonitorIds.clear(); // 重置已使用的 Monitor ID
 
     // 检查屏幕录制权限（仅 macOS）
     if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
@@ -636,134 +631,57 @@ export default class Screenshots extends Events {
   }
 
   private async capture(display: Display): Promise<string> {
-    this.logger('SCREENSHOTS:capture');
+    this.logger('SCREENSHOTS:capture display:', display.id);
 
-    try {
-      // Monitor is now statically imported
-      // 使用 Monitor.all() 并手动匹配，比 Monitor.fromPoint 更可靠
-      // 特别是在多屏且有 DPI 缩放的情况下
-      const monitors = Monitor.all();
-      let monitor = monitors.find(
-        (m) => Math.abs(m.x - display.x) < 10 && Math.abs(m.y - display.y) < 10,
+    // 使用 Electron 内置的 desktopCapturer，全平台通用（Win7/10/11、macOS、Linux）
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: display.width * display.scaleFactor,
+        height: display.height * display.scaleFactor,
+      },
+    });
+
+    let source;
+    // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
+    // 和这里 source 对象上的 display_id(Linux上，这个值是空字符串) 或 id 的中间部分，都不一致
+    // 但是，如果只有一个显示器的话，其实不用判断，直接返回就行
+    if (sources.length === 1) {
+      [source] = sources;
+    } else {
+      source = sources.find(
+        (item) => item.display_id === display.id.toString()
+          || item.id.startsWith(`screen:${display.id}:`),
       );
-
-      // 如果没找到完全匹配的，尝试找中心点匹配
-      if (!monitor) {
-        const centerX = display.x + display.width / 2;
-        const centerY = display.y + display.height / 2;
-        monitor = monitors.find((m) => centerX >= m.x && centerX < m.x + m.width
-          && centerY >= m.y && centerY < m.y + m.height);
-      }
-
-      // 如果还是没找到，回退到 Monitor.fromPoint
-      if (!monitor) {
-        const fromPoint = Monitor.fromPoint(
-          display.x + display.width / 2,
-          display.y + display.height / 2,
-        );
-        if (fromPoint) {
-          monitor = fromPoint;
-        }
-      }
-
-      this.logger(
-        'SCREENSHOTS:capture Match result: display(id=%d, x=%d, y=%d) -> monitor(id=%d, x=%d, y=%d)',
-        display.id,
-        display.x,
-        display.y,
-        monitor?.id,
-        monitor?.x,
-        monitor?.y,
-      );
-
-      if (!monitor) {
-        throw new Error(`Monitor match failed for display ${display.id}`);
-      }
-
-      // 检查 Monitor 是否已经被其他 Display 使用过
-      // 如果多个 Display 匹配到同一个 Monitor，说明匹配逻辑失效（通常发生在多屏缩放不一致时）
-      // 此时应该抛出错误，回退到 desktopCapturer
-      if (this.usedMonitorIds.has(monitor.id)) {
-        this.logger(
-          'WARNING: Monitor %d already used, falling back to desktopCapturer',
-          monitor.id,
-        );
-        throw new Error(`Monitor ${monitor.id} already used`);
-      }
-      this.usedMonitorIds.add(monitor.id);
-
-      const image = await monitor.captureImage();
-      const buffer = await image.toPng(true);
-
-      // 保存到临时文件避免IPC传输大数据导致崩溃
-      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
-      await fs.ensureDir(tempDir);
-      const tempFile = path.join(
-        tempDir,
-        `screenshot-${display.id}-${Date.now()}.png`,
-      );
-      await fs.writeFile(tempFile, buffer);
-      this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
-      this.logger(
-        'Screenshot saved to temp file:',
-        tempFile,
-        'size:',
-        buffer.length,
-      );
-
-      return `file://${tempFile}`;
-    } catch (err) {
-      this.logger('SCREENSHOTS:capture Monitor capture() error %o', err);
-
-      const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: {
-          width: display.width * display.scaleFactor,
-          height: display.height * display.scaleFactor,
-        },
-      });
-
-      let source;
-      // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
-      // 和这里 source 对象上的 display_id(Linux上，这个值是空字符串) 或 id 的中间部分，都不一致
-      // 但是，如果只有一个显示器的话，其实不用判断，直接返回就行
-      if (sources.length === 1) {
-        [source] = sources;
-      } else {
-        source = sources.find(
-          (item) => item.display_id === display.id.toString()
-            || item.id.startsWith(`screen:${display.id}:`),
-        );
-      }
-
-      if (!source) {
-        this.logger(
-          "SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o",
-          sources,
-          display,
-        );
-        throw new Error("Can't find screen source");
-      }
-
-      // 保存到临时文件避免IPC传输大数据导致崩溃
-      const pngBuffer = source.thumbnail.toPNG();
-      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
-      await fs.ensureDir(tempDir);
-      const tempFile = path.join(
-        tempDir,
-        `screenshot-${display.id}-${Date.now()}.png`,
-      );
-      await fs.writeFile(tempFile, pngBuffer);
-      this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
-      this.logger(
-        'Screenshot saved to temp file (desktopCapturer):',
-        tempFile,
-        'size:',
-        pngBuffer.length,
-      );
-
-      return `file://${tempFile}`;
     }
+
+    if (!source) {
+      this.logger(
+        "SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o",
+        sources,
+        display,
+      );
+      throw new Error("Can't find screen source");
+    }
+
+    // 保存到临时文件避免IPC传输大数据导致崩溃
+    const pngBuffer = source.thumbnail.toPNG();
+    const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+    await fs.ensureDir(tempDir);
+    const tempFile = path.join(
+      tempDir,
+      `screenshot-${display.id}-${Date.now()}.png`,
+    );
+    await fs.writeFile(tempFile, pngBuffer as Uint8Array);
+    this.tempFiles.add(tempFile);
+    this.logger(
+      'Screenshot saved to temp file:',
+      tempFile,
+      'size:',
+      pngBuffer.length,
+    );
+
+    return `file://${tempFile}`;
   }
 
   /**
@@ -861,7 +779,7 @@ export default class Screenshots extends Events {
           return;
         }
 
-        await fs.writeFile(filePath, buffer);
+        await fs.writeFile(filePath, buffer as Uint8Array);
         this.emit('afterSave', new Event(), buffer, data, true); // isSaved = true
         this.endCapture();
       },
