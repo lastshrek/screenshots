@@ -69,6 +69,13 @@ export default class Screenshots extends Events {
 
   private isReady: Promise<void>;
 
+  // 预加载的窗口和视图（用于加速启动）
+  private preloadedWins: Map<number, BrowserWindow> = new Map();
+
+  private preloadedViews: Map<number, BrowserView> = new Map();
+
+  private preloadReady: Map<number, boolean> = new Map();
+
   constructor(opts?: ScreenshotsOpts) {
     super();
     // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
@@ -86,11 +93,123 @@ export default class Screenshots extends Events {
       this.setLang(opts.lang);
     }
 
-    // 预加载窗口逻辑已移除，以避免抢占焦点导致部分窗口消失
-    // this.preloadWindows();
-
     // 清理旧的临时文件
     this.cleanupOldTempFiles();
+
+    // 延迟预加载窗口，避免影响应用启动
+    if (this.singleWindow) {
+      setTimeout(() => this.preloadWindows(), 1000);
+    }
+  }
+
+  /**
+   * 预加载窗口（后台静默创建，不显示）
+   */
+  private async preloadWindows(): Promise<void> {
+    this.logger('Preloading windows...');
+    const displays = getAllDisplays();
+
+    // 串行创建预加载窗口，避免资源竞争
+    await displays.reduce(
+      (promise, display) => promise.then(() => this.createPreloadWindow(display)),
+      Promise.resolve(),
+    );
+    this.logger('Windows preloaded');
+  }
+
+  /**
+   * 创建预加载窗口（隐藏状态）
+   */
+  private async createPreloadWindow(display: Display): Promise<void> {
+    if (this.preloadedWins.has(display.id)) {
+      return;
+    }
+
+    const windowTypes: Record<string, string | undefined> = {
+      darwin: 'panel',
+      linux: undefined,
+      win32: undefined,
+    };
+
+    const win = new BrowserWindow({
+      title: 'screenshots',
+      x: display.x,
+      y: display.y,
+      width: display.width,
+      height: display.height,
+      useContentSize: true,
+      type: windowTypes[process.platform],
+      frame: false,
+      show: false, // 关键：不显示
+      autoHideMenuBar: true,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      focusable: true,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      fullscreen: false,
+      fullscreenable: false,
+      kiosk: false,
+      backgroundColor: '#00000001',
+      titleBarStyle: 'hidden',
+      hasShadow: false,
+      paintWhenInitiallyHidden: true, // 允许后台渲染
+      roundedCorners: false,
+      enableLargerThanScreen: false,
+      acceptFirstMouse: true,
+    });
+
+    const view = new BrowserView({
+      webPreferences: {
+        preload: require.resolve('./preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    // 查找 HTML 路径
+    let htmlPath: string;
+    try {
+      const reactScreenshotsPath = require.resolve('react-screenshots');
+      htmlPath = path.join(
+        path.dirname(reactScreenshotsPath),
+        '../electron/electron.html',
+      );
+    } catch (err) {
+      htmlPath = path.join(
+        __dirname,
+        '../../react-screenshots/electron/electron.html',
+      );
+    }
+
+    win.setBrowserView(view);
+    view.setBounds({
+      x: 0,
+      y: 0,
+      width: display.width,
+      height: display.height,
+    });
+
+    // 加载 UI
+    view.webContents.loadURL(`file://${htmlPath}`);
+
+    // 等待加载完成
+    view.webContents.once('did-finish-load', () => {
+      this.logger(`Preload window ready for display ${display.id}`);
+      this.preloadReady.set(display.id, true);
+    });
+
+    this.preloadedWins.set(display.id, win);
+    this.preloadedViews.set(display.id, view);
+
+    win.on('closed', () => {
+      this.preloadedWins.delete(display.id);
+      this.preloadedViews.delete(display.id);
+      this.preloadReady.delete(display.id);
+    });
   }
 
   private createReadyPromise(): Promise<void> {
@@ -151,6 +270,7 @@ export default class Screenshots extends Events {
    */
   public async startCapture(): Promise<void> {
     this.logger('startCapture');
+    const startTime = Date.now();
 
     // 检查屏幕录制权限（仅 macOS）
     if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
@@ -160,14 +280,9 @@ export default class Screenshots extends Events {
       );
     }
 
-    // 重置 isReady Promise，确保等待新的窗口 ready 事件
-    this.isReady = this.createReadyPromise();
-
     // 注册全局 ESC 快捷键，确保能退出
     globalShortcut.register('Esc', () => {
       this.logger('Global ESC pressed, canceling capture');
-
-      // 触发 cancel 事件，和 IPC 处理保持一致
       const event = new Event();
       this.emit('cancel', event);
       if (event.defaultPrevented) {
@@ -178,84 +293,133 @@ export default class Screenshots extends Events {
 
     const displays = getAllDisplays();
 
-    const captures = await Promise.all(
-      displays.map((display) => this.capture(display)
-        .then((url) => ({ display, url }))
-        .catch((err) => {
-          this.logger(`Failed to capture display ${display.id}:`, err);
-          return null;
-        })),
-    );
+    // 并行执行：截图 + 准备窗口
+    const [captures] = await Promise.all([
+      // 截图
+      Promise.all(
+        displays.map((display) => this.capture(display)
+          .then((url) => ({ display, url }))
+          .catch((err) => {
+            this.logger(`Failed to capture display ${display.id}:`, err);
+            return null;
+          })),
+      ),
+      // 确保窗口已准备好（如果使用预加载）
+      this.singleWindow ? this.ensureWindowsReady(displays) : Promise.resolve(),
+    ]);
 
-    // 截图完成后，再创建/显示窗口
-    await Promise.all(
-      captures.map(async (cap) => {
-        if (cap) {
-          // 这里不再复用预加载的窗口，而是直接创建并显示
-          await this.createWindow(cap.display, true);
-        }
-      }),
-    );
+    this.logger(`Capture completed in ${Date.now() - startTime}ms`);
 
-    // 等待所有窗口的 React 应用 ready
-    // 为每个窗口创建一个独立的 ready promise
-    const readyPromises = captures
-      .filter((cap) => cap !== null)
-      .map((cap) => new Promise<void>((resolve) => {
-        const displayId = cap!.display.id;
-        const checkReady = () => {
-          const view = this.$views.get(displayId);
-          if (view && !view.webContents.isDestroyed()) {
-            // 检查 webContents 是否已经加载完成
-            if (view.webContents.getURL()) {
-              this.logger(`Display ${displayId} is ready`);
-              resolve();
-            } else {
-              // 如果还没加载完，等待一下再检查
-              setTimeout(checkReady, 50);
-            }
-          } else {
-            // 如果 view 不存在或已销毁，也 resolve（避免卡住）
-            this.logger(`Display ${displayId} view not found or destroyed`);
-            resolve();
-          }
-        };
-        checkReady();
-      }));
+    // 显示窗口并发送数据
+    const validCaptures = captures.filter((cap): cap is NonNullable<typeof cap> => cap !== null);
 
-    this.logger(`Waiting for ${readyPromises.length} displays to be ready...`);
-    await Promise.all(readyPromises);
-    this.logger('All displays are ready');
+    await Promise.all(validCaptures.map((cap) => this.showWindowWithCapture(cap.display, cap.url)));
 
-    // 发送数据前，再次强制所有窗口置顶，防止被主程序遮挡
-    this.$wins.forEach((win) => {
-      if (win && !win.isDestroyed()) {
-        win.setAlwaysOnTop(true, 'screen-saver');
-        win.moveTop();
-      }
-    });
-
-    // 根据鼠标位置设置初始焦点
+    // 设置焦点到鼠标所在的显示器
     const cursorPoint = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(cursorPoint);
-    const focusWin = this.$wins.get(display.id);
+    const focusDisplay = screen.getDisplayNearestPoint(cursorPoint);
+    const focusWin = this.$wins.get(focusDisplay.id);
     if (focusWin && !focusWin.isDestroyed()) {
-      this.logger(`Focusing window for display ${display.id} (mouse at ${cursorPoint.x}, ${cursorPoint.y})`);
       focusWin.focus();
     }
 
-    // 发送数据
-    captures.forEach((cap) => {
-      if (cap) {
-        const view = this.$views.get(cap.display.id);
-        this.logger(`Sending screenshot data to display ${cap.display.id}`);
-        // 添加短暂延迟，确保渲染进程已完全激活并准备好接收数据
-        // 这有助于解决在某些情况下（如窗口刚获得焦点）数据丢失的问题
-        setTimeout(() => {
-          view?.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
-        }, 100);
+    this.logger(`Total startup time: ${Date.now() - startTime}ms`);
+  }
+
+  /**
+   * 显示窗口并发送截图数据
+   */
+  private async showWindowWithCapture(display: Display, url: string): Promise<void> {
+    // 尝试使用预加载的窗口
+    const win = this.preloadedWins.get(display.id);
+    const view = this.preloadedViews.get(display.id);
+
+    if (win && !win.isDestroyed() && view && this.preloadReady.get(display.id)) {
+      // 使用预加载的窗口
+      this.logger(`Using preloaded window for display ${display.id}`);
+      this.$wins.set(display.id, win);
+      this.$views.set(display.id, view);
+      this.preloadedWins.delete(display.id);
+      this.preloadedViews.delete(display.id);
+      this.preloadReady.delete(display.id);
+
+      // 更新窗口位置（以防显示器配置变化）
+      win.setBounds(display);
+      view.setBounds({
+        x: 0, y: 0, width: display.width, height: display.height,
+      });
+
+      // 显示窗口
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.show();
+      win.focus();
+      win.moveTop();
+
+      // 发送截图数据
+      view.webContents.send('SCREENSHOTS:capture', display, url);
+
+      this.emit('windowCreated', win);
+      win.on('closed', () => {
+        this.emit('windowClosed', win);
+        this.$wins.delete(display.id);
+        this.$views.delete(display.id);
+      });
+    } else {
+      // 回退：创建新窗口
+      this.logger(`Creating new window for display ${display.id}`);
+      await this.createWindow(display, true);
+      const newView = this.$views.get(display.id);
+      if (newView) {
+        // 等待 UI 加载完成后发送数据
+        if (newView.webContents.getURL()) {
+          newView.webContents.send('SCREENSHOTS:capture', display, url);
+        } else {
+          newView.webContents.once('did-finish-load', () => {
+            newView.webContents.send('SCREENSHOTS:capture', display, url);
+          });
+        }
       }
-    });
+    }
+  }
+
+  /**
+   * 确保预加载窗口已准备好
+   */
+  private async ensureWindowsReady(displays: Display[]): Promise<void> {
+    const promises = displays.map((display) => new Promise<void>((resolve) => {
+      if (this.preloadReady.get(display.id)) {
+        resolve();
+        return;
+      }
+
+      // 如果还没预加载，立即创建
+      if (!this.preloadedWins.has(display.id)) {
+        this.createPreloadWindow(display).then(() => {
+          // 等待加载完成
+          const checkReady = () => {
+            if (this.preloadReady.get(display.id)) {
+              resolve();
+            } else {
+              setTimeout(checkReady, 10);
+            }
+          };
+          checkReady();
+        });
+        return;
+      }
+
+      // 等待已有窗口加载完成
+      const checkReady = () => {
+        if (this.preloadReady.get(display.id)) {
+          resolve();
+        } else {
+          setTimeout(checkReady, 10);
+        }
+      };
+      checkReady();
+    }));
+
+    await Promise.all(promises);
   }
 
   /**
@@ -269,45 +433,43 @@ export default class Screenshots extends Events {
 
     await this.reset();
 
-    // Iterate over all windows
+    // 处理所有窗口
     this.$wins.forEach((win, id) => {
       const view = this.$views.get(id);
       if (win && !win.isDestroyed()) {
-        // this.logger('endCapture: restoring window state', id);
         if (win.isKiosk()) {
           win.setKiosk(false);
         }
-        // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
-        // win.blur(); // 移除 blur，避免干扰 Dock 栏恢复
         win.blurWebView();
         win.unmaximize();
 
-        // 延迟隐藏窗口，等待 macOS 动画/状态更新完成
-        // 这解决了退出截图后任务栏消失的问题
-        setTimeout(() => {
-          if (win.isDestroyed()) {
-            return;
-          }
-
-          if (view) {
-            try {
-              win.removeBrowserView(view);
-            } catch (e) {
-              // ignore
+        if (this.singleWindow && view && !view.webContents.isDestroyed()) {
+          // 复用模式：隐藏窗口，放回预加载池
+          win.hide();
+          this.preloadedWins.set(id, win);
+          this.preloadedViews.set(id, view);
+          this.preloadReady.set(id, true);
+          this.logger(`Window ${id} returned to preload pool`);
+        } else {
+          // 非复用模式：销毁窗口
+          setTimeout(() => {
+            if (win.isDestroyed()) return;
+            if (view) {
+              try {
+                win.removeBrowserView(view);
+              } catch (e) {
+                // ignore
+              }
             }
-          }
-
-          // 强制销毁窗口，确保下一次是全新的环境
-          win.destroy();
-        }, 400); // 增加延迟到 400ms
+            win.destroy();
+          }, 100);
+        }
       }
     });
 
-    // 总是清理引用，确保下次重新创建
-    setTimeout(() => {
-      this.$wins.clear();
-      this.$views.clear();
-    }, 400);
+    // 清理当前引用
+    this.$wins.clear();
+    this.$views.clear();
 
     // 清理本次截图产生的临时文件
     this.cleanupCurrentTempFiles();
@@ -632,6 +794,7 @@ export default class Screenshots extends Events {
 
   private async capture(display: Display): Promise<string> {
     this.logger('SCREENSHOTS:capture display:', display.id);
+    const captureStart = Date.now();
 
     // 使用 Electron 内置的 desktopCapturer，全平台通用（Win7/10/11、macOS、Linux）
     const sources = await desktopCapturer.getSources({
@@ -641,6 +804,8 @@ export default class Screenshots extends Events {
         height: display.height * display.scaleFactor,
       },
     });
+
+    this.logger(`desktopCapturer.getSources took ${Date.now() - captureStart}ms`);
 
     let source;
     // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
@@ -664,24 +829,14 @@ export default class Screenshots extends Events {
       throw new Error("Can't find screen source");
     }
 
-    // 保存到临时文件避免IPC传输大数据导致崩溃
-    const pngBuffer = source.thumbnail.toPNG();
-    const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
-    await fs.ensureDir(tempDir);
-    const tempFile = path.join(
-      tempDir,
-      `screenshot-${display.id}-${Date.now()}.png`,
-    );
-    await fs.writeFile(tempFile, pngBuffer as Uint8Array);
-    this.tempFiles.add(tempFile);
+    // 直接使用 Data URL，避免文件 I/O 开销
+    // 对于大多数屏幕分辨率，这比写入临时文件更快
+    const dataUrl = source.thumbnail.toDataURL();
     this.logger(
-      'Screenshot saved to temp file:',
-      tempFile,
-      'size:',
-      pngBuffer.length,
+      `Screenshot captured for display ${display.id}, size: ${dataUrl.length}, took ${Date.now() - captureStart}ms`,
     );
 
-    return `file://${tempFile}`;
+    return dataUrl;
   }
 
   /**
