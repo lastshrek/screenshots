@@ -1,10 +1,26 @@
 # 📷 screenshots
 
+> 🔀 本项目 Fork 自 [nashaofu/screenshots](https://github.com/nashaofu/screenshots)，感谢原作者的优秀工作！
+
 `screenshots`是一个基于`electron`和`react`的截图插件，可以快速地实现截图功能，并支持多种截图操作，例如马赛克、文本、画笔、箭头、椭圆和矩形。此外，还提供了多语言支持，可以轻松地适配不同的语言环境。
 
 在线示例：[https://nashaofu.github.io/screenshots/](https://nashaofu.github.io/screenshots/)
 
 ![react-screenshots](./screenshot.jpg)
+
+## Fork 改动
+
+相比原项目，本 Fork 主要做了以下改进：
+
+- ✅ **Windows 7 兼容**：移除 `node-screenshots` 原生依赖，统一使用 Electron 内置的 `desktopCapturer` API
+- ⚡ **启动速度优化**：窗口预加载、批量截图、窗口复用，显著提升截图响应速度
+- 🖥️ **全平台支持**：Windows 7/10/11、macOS、Linux 使用统一的截图逻辑
+
+### 安装本 Fork
+
+```bash
+npm install github:lastshrek/screenshots
+```
 
 ## 特性
 
