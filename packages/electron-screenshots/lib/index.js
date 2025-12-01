@@ -68,7 +68,6 @@ var events_1 = __importDefault(require("events"));
 var fs_extra_1 = __importDefault(require("fs-extra"));
 var path_1 = __importDefault(require("path"));
 var os_1 = __importDefault(require("os"));
-var node_screenshots_1 = require("node-screenshots");
 var event_1 = __importDefault(require("./event"));
 var getDisplay_1 = require("./getDisplay");
 var padStart_1 = __importDefault(require("./padStart"));
@@ -83,8 +82,6 @@ var Screenshots = /** @class */ (function (_super) {
         _this.$views = new Map();
         // 记录当前使用的临时文件，用于清理
         _this.tempFiles = new Set();
-        // 用于记录已使用的 Monitor ID，防止多屏匹配错误
-        _this.usedMonitorIds = new Set();
         // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
         _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger)
             || (function () {
@@ -197,7 +194,6 @@ var Screenshots = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.logger('startCapture');
-                        this.usedMonitorIds.clear(); // 重置已使用的 Monitor ID
                         // 检查屏幕录制权限（仅 macOS）
                         if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
                             this.logger('Screen recording permission denied');
@@ -677,62 +673,11 @@ var Screenshots = /** @class */ (function (_super) {
     };
     Screenshots.prototype.capture = function (display) {
         return __awaiter(this, void 0, void 0, function () {
-            var monitors, monitor, centerX_1, centerY_1, fromPoint, image, buffer, tempDir, tempFile, err_3, sources, source, pngBuffer, tempDir, tempFile;
+            var sources, source, pngBuffer, tempDir, tempFile;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        this.logger('SCREENSHOTS:capture');
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, 6, , 10]);
-                        monitors = node_screenshots_1.Monitor.all();
-                        monitor = monitors.find(function (m) { return Math.abs(m.x - display.x) < 10 && Math.abs(m.y - display.y) < 10; });
-                        // 如果没找到完全匹配的，尝试找中心点匹配
-                        if (!monitor) {
-                            centerX_1 = display.x + display.width / 2;
-                            centerY_1 = display.y + display.height / 2;
-                            monitor = monitors.find(function (m) { return centerX_1 >= m.x && centerX_1 < m.x + m.width
-                                && centerY_1 >= m.y && centerY_1 < m.y + m.height; });
-                        }
-                        // 如果还是没找到，回退到 Monitor.fromPoint
-                        if (!monitor) {
-                            fromPoint = node_screenshots_1.Monitor.fromPoint(display.x + display.width / 2, display.y + display.height / 2);
-                            if (fromPoint) {
-                                monitor = fromPoint;
-                            }
-                        }
-                        this.logger('SCREENSHOTS:capture Match result: display(id=%d, x=%d, y=%d) -> monitor(id=%d, x=%d, y=%d)', display.id, display.x, display.y, monitor === null || monitor === void 0 ? void 0 : monitor.id, monitor === null || monitor === void 0 ? void 0 : monitor.x, monitor === null || monitor === void 0 ? void 0 : monitor.y);
-                        if (!monitor) {
-                            throw new Error("Monitor match failed for display ".concat(display.id));
-                        }
-                        // 检查 Monitor 是否已经被其他 Display 使用过
-                        // 如果多个 Display 匹配到同一个 Monitor，说明匹配逻辑失效（通常发生在多屏缩放不一致时）
-                        // 此时应该抛出错误，回退到 desktopCapturer
-                        if (this.usedMonitorIds.has(monitor.id)) {
-                            this.logger('WARNING: Monitor %d already used, falling back to desktopCapturer', monitor.id);
-                            throw new Error("Monitor ".concat(monitor.id, " already used"));
-                        }
-                        this.usedMonitorIds.add(monitor.id);
-                        return [4 /*yield*/, monitor.captureImage()];
-                    case 2:
-                        image = _a.sent();
-                        return [4 /*yield*/, image.toPng(true)];
-                    case 3:
-                        buffer = _a.sent();
-                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
-                        return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
-                    case 4:
-                        _a.sent();
-                        tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
-                        return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, buffer)];
-                    case 5:
-                        _a.sent();
-                        this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
-                        this.logger('Screenshot saved to temp file:', tempFile, 'size:', buffer.length);
-                        return [2 /*return*/, "file://".concat(tempFile)];
-                    case 6:
-                        err_3 = _a.sent();
-                        this.logger('SCREENSHOTS:capture Monitor capture() error %o', err_3);
+                        this.logger('SCREENSHOTS:capture display:', display.id);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
                                 types: ['screen'],
                                 thumbnailSize: {
@@ -740,9 +685,8 @@ var Screenshots = /** @class */ (function (_super) {
                                     height: display.height * display.scaleFactor,
                                 },
                             })];
-                    case 7:
+                    case 1:
                         sources = _a.sent();
-                        source = void 0;
                         // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
                         // 和这里 source 对象上的 display_id(Linux上，这个值是空字符串) 或 id 的中间部分，都不一致
                         // 但是，如果只有一个显示器的话，其实不用判断，直接返回就行
@@ -760,16 +704,15 @@ var Screenshots = /** @class */ (function (_super) {
                         pngBuffer = source.thumbnail.toPNG();
                         tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
                         return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
-                    case 8:
+                    case 2:
                         _a.sent();
                         tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
                         return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, pngBuffer)];
-                    case 9:
+                    case 3:
                         _a.sent();
-                        this.tempFiles.add(tempFile); // 记录临时文件用于后续清理
-                        this.logger('Screenshot saved to temp file (desktopCapturer):', tempFile, 'size:', pngBuffer.length);
+                        this.tempFiles.add(tempFile);
+                        this.logger('Screenshot saved to temp file:', tempFile, 'size:', pngBuffer.length);
                         return [2 /*return*/, "file://".concat(tempFile)];
-                    case 10: return [2 /*return*/];
                 }
             });
         });
