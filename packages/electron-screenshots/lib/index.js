@@ -82,6 +82,13 @@ var Screenshots = /** @class */ (function (_super) {
         _this.$views = new Map();
         // 记录当前使用的临时文件，用于清理
         _this.tempFiles = new Set();
+        // 预加载的窗口和视图（用于加速启动）
+        _this.preloadedWins = new Map();
+        _this.preloadedViews = new Map();
+        _this.preloadReady = new Map();
+        // 缓存的截图源，避免多显示器时重复调用 desktopCapturer
+        _this.cachedSources = null;
+        _this.cachedSourcesTime = 0;
         // 强制使用 console.log 以便调试，除非用户指定了自定义 logger
         _this.logger = (opts === null || opts === void 0 ? void 0 : opts.logger)
             || (function () {
@@ -100,12 +107,122 @@ var Screenshots = /** @class */ (function (_super) {
         if (opts === null || opts === void 0 ? void 0 : opts.lang) {
             _this.setLang(opts.lang);
         }
-        // 预加载窗口逻辑已移除，以避免抢占焦点导致部分窗口消失
-        // this.preloadWindows();
-        // 清理旧的临时文件
+        // 清理旧的临时文件（异步，不阻塞）
         _this.cleanupOldTempFiles();
+        // 尽快预加载窗口（使用 setImmediate 在当前事件循环结束后立即执行）
+        if (_this.singleWindow) {
+            setImmediate(function () { return _this.preloadWindows(); });
+        }
         return _this;
     }
+    /**
+     * 预加载窗口（后台静默创建，不显示）
+     */
+    Screenshots.prototype.preloadWindows = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var displays;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.logger('Preloading windows...');
+                        displays = (0, getDisplay_1.getAllDisplays)();
+                        // 串行创建预加载窗口，避免资源竞争
+                        return [4 /*yield*/, displays.reduce(function (promise, display) { return promise.then(function () { return _this.createPreloadWindow(display); }); }, Promise.resolve())];
+                    case 1:
+                        // 串行创建预加载窗口，避免资源竞争
+                        _a.sent();
+                        this.logger('Windows preloaded');
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
+     * 创建预加载窗口（隐藏状态）
+     */
+    Screenshots.prototype.createPreloadWindow = function (display) {
+        return __awaiter(this, void 0, void 0, function () {
+            var windowTypes, win, view, htmlPath, reactScreenshotsPath;
+            var _this = this;
+            return __generator(this, function (_a) {
+                if (this.preloadedWins.has(display.id)) {
+                    return [2 /*return*/];
+                }
+                windowTypes = {
+                    darwin: 'panel',
+                    linux: undefined,
+                    win32: undefined,
+                };
+                win = new electron_1.BrowserWindow({
+                    title: 'screenshots',
+                    x: display.x,
+                    y: display.y,
+                    width: display.width,
+                    height: display.height,
+                    useContentSize: true,
+                    type: windowTypes[process.platform],
+                    frame: false,
+                    show: false,
+                    autoHideMenuBar: true,
+                    transparent: true,
+                    resizable: false,
+                    movable: false,
+                    minimizable: false,
+                    maximizable: false,
+                    focusable: true,
+                    skipTaskbar: true,
+                    alwaysOnTop: true,
+                    fullscreen: false,
+                    fullscreenable: false,
+                    kiosk: false,
+                    backgroundColor: '#00000001',
+                    titleBarStyle: 'hidden',
+                    hasShadow: false,
+                    paintWhenInitiallyHidden: true,
+                    roundedCorners: false,
+                    enableLargerThanScreen: false,
+                    acceptFirstMouse: true,
+                });
+                view = new electron_1.BrowserView({
+                    webPreferences: {
+                        preload: require.resolve('./preload.js'),
+                        nodeIntegration: false,
+                        contextIsolation: true,
+                    },
+                });
+                try {
+                    reactScreenshotsPath = require.resolve('react-screenshots');
+                    htmlPath = path_1.default.join(path_1.default.dirname(reactScreenshotsPath), '../electron/electron.html');
+                }
+                catch (err) {
+                    htmlPath = path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html');
+                }
+                win.setBrowserView(view);
+                view.setBounds({
+                    x: 0,
+                    y: 0,
+                    width: display.width,
+                    height: display.height,
+                });
+                // 加载 UI
+                view.webContents.loadURL("file://".concat(htmlPath));
+                // 等待加载完成
+                view.webContents.once('did-finish-load', function () {
+                    _this.logger("Preload window ready for display ".concat(display.id));
+                    _this.preloadReady.set(display.id, true);
+                });
+                this.preloadedWins.set(display.id, win);
+                this.preloadedViews.set(display.id, view);
+                win.on('closed', function () {
+                    _this.preloadedWins.delete(display.id);
+                    _this.preloadedViews.delete(display.id);
+                    _this.preloadReady.delete(display.id);
+                });
+                return [2 /*return*/];
+            });
+        });
+    };
     Screenshots.prototype.createReadyPromise = function () {
         var _this = this;
         return new Promise(function (resolve) {
@@ -188,23 +305,21 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.startCapture = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var displays, captures, readyPromises, cursorPoint, display, focusWin;
+            var startTime, displays, captureMap, validCaptures, cursorPoint, focusDisplay, focusWin;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         this.logger('startCapture');
+                        startTime = Date.now();
                         // 检查屏幕录制权限（仅 macOS）
                         if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
                             this.logger('Screen recording permission denied');
                             throw new Error('Screen recording permission was denied. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.');
                         }
-                        // 重置 isReady Promise，确保等待新的窗口 ready 事件
-                        this.isReady = this.createReadyPromise();
                         // 注册全局 ESC 快捷键，确保能退出
                         electron_1.globalShortcut.register('Esc', function () {
                             _this.logger('Global ESC pressed, canceling capture');
-                            // 触发 cancel 事件，和 IPC 处理保持一致
                             var event = new event_1.default();
                             _this.emit('cancel', event);
                             if (event.defaultPrevented) {
@@ -213,89 +328,196 @@ var Screenshots = /** @class */ (function (_super) {
                             _this.endCapture();
                         });
                         displays = (0, getDisplay_1.getAllDisplays)();
-                        return [4 /*yield*/, Promise.all(displays.map(function (display) { return _this.capture(display)
-                                .then(function (url) { return ({ display: display, url: url }); })
-                                .catch(function (err) {
-                                _this.logger("Failed to capture display ".concat(display.id, ":"), err);
-                                return null;
-                            }); }))];
+                        return [4 /*yield*/, Promise.all([
+                                // 一次性截取所有屏幕（避免多次调用 desktopCapturer）
+                                this.captureAllDisplays(displays),
+                                // 确保窗口已准备好（如果使用预加载）
+                                this.singleWindow ? this.ensureWindowsReady(displays) : Promise.resolve(),
+                            ])];
                     case 1:
-                        captures = _a.sent();
-                        // 截图完成后，再创建/显示窗口
-                        return [4 /*yield*/, Promise.all(captures.map(function (cap) { return __awaiter(_this, void 0, void 0, function () {
-                                return __generator(this, function (_a) {
-                                    switch (_a.label) {
-                                        case 0:
-                                            if (!cap) return [3 /*break*/, 2];
-                                            // 这里不再复用预加载的窗口，而是直接创建并显示
-                                            return [4 /*yield*/, this.createWindow(cap.display, true)];
-                                        case 1:
-                                            // 这里不再复用预加载的窗口，而是直接创建并显示
-                                            _a.sent();
-                                            _a.label = 2;
-                                        case 2: return [2 /*return*/];
-                                    }
+                        captureMap = (_a.sent())[0];
+                        this.logger("Capture completed in ".concat(Date.now() - startTime, "ms"));
+                        validCaptures = displays
+                            .filter(function (display) { return captureMap.has(display.id); })
+                            .map(function (display) { return ({ display: display, url: captureMap.get(display.id) }); });
+                        // 同步显示所有窗口（预加载窗口是同步操作）
+                        validCaptures.forEach(function (cap) { return _this.showWindowWithCapture(cap.display, cap.url); });
+                        cursorPoint = electron_1.screen.getCursorScreenPoint();
+                        focusDisplay = electron_1.screen.getDisplayNearestPoint(cursorPoint);
+                        focusWin = this.$wins.get(focusDisplay.id);
+                        if (focusWin && !focusWin.isDestroyed()) {
+                            focusWin.focus();
+                        }
+                        this.logger("Total startup time: ".concat(Date.now() - startTime, "ms"));
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
+     * 显示窗口并发送截图数据
+     */
+    Screenshots.prototype.showWindowWithCapture = function (display, url) {
+        var _this = this;
+        // 尝试使用预加载的窗口
+        var win = this.preloadedWins.get(display.id);
+        var view = this.preloadedViews.get(display.id);
+        if (win && !win.isDestroyed() && view && this.preloadReady.get(display.id)) {
+            // 使用预加载的窗口（最快路径）
+            this.$wins.set(display.id, win);
+            this.$views.set(display.id, view);
+            this.preloadedWins.delete(display.id);
+            this.preloadedViews.delete(display.id);
+            this.preloadReady.delete(display.id);
+            // 更新窗口位置
+            win.setBounds(display);
+            view.setBounds({
+                x: 0, y: 0, width: display.width, height: display.height,
+            });
+            // 先发送截图数据，让渲染进程准备好图片
+            view.webContents.send('SCREENSHOTS:capture', display, url);
+            // 短暂延迟后显示窗口，让渲染进程有时间渲染图片
+            // 这样可以避免看到黑屏/空白窗口
+            setTimeout(function () {
+                if (!win.isDestroyed()) {
+                    win.setAlwaysOnTop(true, 'screen-saver');
+                    win.show();
+                    win.moveTop();
+                }
+            }, 50); // 50ms 足够渲染进程处理图片
+            this.emit('windowCreated', win);
+            win.on('closed', function () {
+                _this.emit('windowClosed', win);
+                _this.$wins.delete(display.id);
+                _this.$views.delete(display.id);
+            });
+        }
+        else {
+            // 回退：创建新窗口（较慢路径）
+            this.logger("Creating new window for display ".concat(display.id));
+            this.createWindowFast(display, url);
+        }
+    };
+    /**
+     * 快速创建窗口（简化版，用于回退场景）
+     */
+    Screenshots.prototype.createWindowFast = function (display, url) {
+        var _this = this;
+        var windowTypes = {
+            darwin: 'panel',
+            linux: undefined,
+            win32: undefined,
+        };
+        var win = new electron_1.BrowserWindow({
+            title: 'screenshots',
+            x: display.x,
+            y: display.y,
+            width: display.width,
+            height: display.height,
+            useContentSize: true,
+            type: windowTypes[process.platform],
+            frame: false,
+            show: false,
+            autoHideMenuBar: true,
+            transparent: true,
+            resizable: false,
+            movable: false,
+            focusable: true,
+            skipTaskbar: true,
+            alwaysOnTop: true,
+            fullscreen: false,
+            fullscreenable: false,
+            kiosk: false,
+            backgroundColor: '#00000001',
+            titleBarStyle: 'hidden',
+            hasShadow: false,
+        });
+        var view = new electron_1.BrowserView({
+            webPreferences: {
+                preload: require.resolve('./preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true,
+            },
+        });
+        var htmlPath;
+        try {
+            var reactScreenshotsPath = require.resolve('react-screenshots');
+            htmlPath = path_1.default.join(path_1.default.dirname(reactScreenshotsPath), '../electron/electron.html');
+        }
+        catch (err) {
+            htmlPath = path_1.default.join(__dirname, '../../react-screenshots/electron/electron.html');
+        }
+        win.setBrowserView(view);
+        view.setBounds({
+            x: 0, y: 0, width: display.width, height: display.height,
+        });
+        view.webContents.loadURL("file://".concat(htmlPath));
+        view.webContents.once('did-finish-load', function () {
+            // 先发送截图数据
+            view.webContents.send('SCREENSHOTS:capture', display, url);
+            // 延迟显示窗口，等待渲染进程处理图片，避免黑屏闪烁
+            setTimeout(function () {
+                if (!win.isDestroyed()) {
+                    win.setAlwaysOnTop(true, 'screen-saver');
+                    win.show();
+                    win.moveTop();
+                }
+            }, 50);
+        });
+        this.$wins.set(display.id, win);
+        this.$views.set(display.id, view);
+        this.emit('windowCreated', win);
+        win.on('closed', function () {
+            _this.emit('windowClosed', win);
+            _this.$wins.delete(display.id);
+            _this.$views.delete(display.id);
+        });
+    };
+    /**
+     * 确保预加载窗口已准备好
+     */
+    Screenshots.prototype.ensureWindowsReady = function (displays) {
+        return __awaiter(this, void 0, void 0, function () {
+            var promises;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        promises = displays.map(function (display) { return new Promise(function (resolve) {
+                            if (_this.preloadReady.get(display.id)) {
+                                resolve();
+                                return;
+                            }
+                            // 如果还没预加载，立即创建
+                            if (!_this.preloadedWins.has(display.id)) {
+                                _this.createPreloadWindow(display).then(function () {
+                                    // 等待加载完成
+                                    var checkReady = function () {
+                                        if (_this.preloadReady.get(display.id)) {
+                                            resolve();
+                                        }
+                                        else {
+                                            setTimeout(checkReady, 10);
+                                        }
+                                    };
+                                    checkReady();
                                 });
-                            }); }))];
-                    case 2:
-                        // 截图完成后，再创建/显示窗口
-                        _a.sent();
-                        readyPromises = captures
-                            .filter(function (cap) { return cap !== null; })
-                            .map(function (cap) { return new Promise(function (resolve) {
-                            var displayId = cap.display.id;
+                                return;
+                            }
+                            // 等待已有窗口加载完成
                             var checkReady = function () {
-                                var view = _this.$views.get(displayId);
-                                if (view && !view.webContents.isDestroyed()) {
-                                    // 检查 webContents 是否已经加载完成
-                                    if (view.webContents.getURL()) {
-                                        _this.logger("Display ".concat(displayId, " is ready"));
-                                        resolve();
-                                    }
-                                    else {
-                                        // 如果还没加载完，等待一下再检查
-                                        setTimeout(checkReady, 50);
-                                    }
+                                if (_this.preloadReady.get(display.id)) {
+                                    resolve();
                                 }
                                 else {
-                                    // 如果 view 不存在或已销毁，也 resolve（避免卡住）
-                                    _this.logger("Display ".concat(displayId, " view not found or destroyed"));
-                                    resolve();
+                                    setTimeout(checkReady, 10);
                                 }
                             };
                             checkReady();
                         }); });
-                        this.logger("Waiting for ".concat(readyPromises.length, " displays to be ready..."));
-                        return [4 /*yield*/, Promise.all(readyPromises)];
-                    case 3:
+                        return [4 /*yield*/, Promise.all(promises)];
+                    case 1:
                         _a.sent();
-                        this.logger('All displays are ready');
-                        // 发送数据前，再次强制所有窗口置顶，防止被主程序遮挡
-                        this.$wins.forEach(function (win) {
-                            if (win && !win.isDestroyed()) {
-                                win.setAlwaysOnTop(true, 'screen-saver');
-                                win.moveTop();
-                            }
-                        });
-                        cursorPoint = electron_1.screen.getCursorScreenPoint();
-                        display = electron_1.screen.getDisplayNearestPoint(cursorPoint);
-                        focusWin = this.$wins.get(display.id);
-                        if (focusWin && !focusWin.isDestroyed()) {
-                            this.logger("Focusing window for display ".concat(display.id, " (mouse at ").concat(cursorPoint.x, ", ").concat(cursorPoint.y, ")"));
-                            focusWin.focus();
-                        }
-                        // 发送数据
-                        captures.forEach(function (cap) {
-                            if (cap) {
-                                var view_1 = _this.$views.get(cap.display.id);
-                                _this.logger("Sending screenshot data to display ".concat(cap.display.id));
-                                // 添加短暂延迟，确保渲染进程已完全激活并准备好接收数据
-                                // 这有助于解决在某些情况下（如窗口刚获得焦点）数据丢失的问题
-                                setTimeout(function () {
-                                    view_1 === null || view_1 === void 0 ? void 0 : view_1.webContents.send('SCREENSHOTS:capture', cap.display, cap.url);
-                                }, 100);
-                            }
-                        });
                         return [2 /*return*/];
                 }
             });
@@ -316,42 +538,44 @@ var Screenshots = /** @class */ (function (_super) {
                         return [4 /*yield*/, this.reset()];
                     case 1:
                         _a.sent();
-                        // Iterate over all windows
+                        // 处理所有窗口
                         this.$wins.forEach(function (win, id) {
                             var view = _this.$views.get(id);
                             if (win && !win.isDestroyed()) {
-                                // this.logger('endCapture: restoring window state', id);
                                 if (win.isKiosk()) {
                                     win.setKiosk(false);
                                 }
-                                // win.setSimpleFullScreen(false); // 尝试关闭 SimpleFullScreen (macOS)
-                                // win.blur(); // 移除 blur，避免干扰 Dock 栏恢复
                                 win.blurWebView();
                                 win.unmaximize();
-                                // 延迟隐藏窗口，等待 macOS 动画/状态更新完成
-                                // 这解决了退出截图后任务栏消失的问题
-                                setTimeout(function () {
-                                    if (win.isDestroyed()) {
-                                        return;
-                                    }
-                                    if (view) {
-                                        try {
-                                            win.removeBrowserView(view);
+                                if (_this.singleWindow && view && !view.webContents.isDestroyed()) {
+                                    // 复用模式：隐藏窗口，放回预加载池
+                                    win.hide();
+                                    _this.preloadedWins.set(id, win);
+                                    _this.preloadedViews.set(id, view);
+                                    _this.preloadReady.set(id, true);
+                                    _this.logger("Window ".concat(id, " returned to preload pool"));
+                                }
+                                else {
+                                    // 非复用模式：销毁窗口
+                                    setTimeout(function () {
+                                        if (win.isDestroyed())
+                                            return;
+                                        if (view) {
+                                            try {
+                                                win.removeBrowserView(view);
+                                            }
+                                            catch (e) {
+                                                // ignore
+                                            }
                                         }
-                                        catch (e) {
-                                            // ignore
-                                        }
-                                    }
-                                    // 强制销毁窗口，确保下一次是全新的环境
-                                    win.destroy();
-                                }, 400); // 增加延迟到 400ms
+                                        win.destroy();
+                                    }, 100);
+                                }
                             }
                         });
-                        // 总是清理引用，确保下次重新创建
-                        setTimeout(function () {
-                            _this.$wins.clear();
-                            _this.$views.clear();
-                        }, 400);
+                        // 清理当前引用
+                        this.$wins.clear();
+                        this.$views.clear();
                         // 清理本次截图产生的临时文件
                         this.cleanupCurrentTempFiles();
                         return [2 /*return*/];
@@ -671,48 +895,69 @@ var Screenshots = /** @class */ (function (_super) {
             });
         });
     };
-    Screenshots.prototype.capture = function (display) {
+    /**
+     * 批量获取所有显示器的截图（一次 API 调用）
+     */
+    Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var sources, source, pngBuffer, tempDir, tempFile;
+            var captureStart, result, maxWidth, maxHeight, sources, sortedDisplays;
+            var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        this.logger('SCREENSHOTS:capture display:', display.id);
+                        captureStart = Date.now();
+                        result = new Map();
+                        maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
+                        maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
                                 types: ['screen'],
-                                thumbnailSize: {
-                                    width: display.width * display.scaleFactor,
-                                    height: display.height * display.scaleFactor,
-                                },
+                                thumbnailSize: { width: maxWidth, height: maxHeight },
                             })];
                     case 1:
                         sources = _a.sent();
-                        // Linux系统上，screen.getDisplayNearestPoint 返回的 Display 对象的 id
-                        // 和这里 source 对象上的 display_id(Linux上，这个值是空字符串) 或 id 的中间部分，都不一致
-                        // 但是，如果只有一个显示器的话，其实不用判断，直接返回就行
-                        if (sources.length === 1) {
-                            source = sources[0];
-                        }
-                        else {
-                            source = sources.find(function (item) { return item.display_id === display.id.toString()
-                                || item.id.startsWith("screen:".concat(display.id, ":")); });
-                        }
-                        if (!source) {
-                            this.logger("SCREENSHOTS:capture Can't find screen source. sources: %o, display: %o", sources, display);
-                            throw new Error("Can't find screen source");
-                        }
-                        pngBuffer = source.thumbnail.toPNG();
-                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
-                        return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
-                    case 2:
-                        _a.sent();
-                        tempFile = path_1.default.join(tempDir, "screenshot-".concat(display.id, "-").concat(Date.now(), ".png"));
-                        return [4 /*yield*/, fs_extra_1.default.writeFile(tempFile, pngBuffer)];
-                    case 3:
-                        _a.sent();
-                        this.tempFiles.add(tempFile);
-                        this.logger('Screenshot saved to temp file:', tempFile, 'size:', pngBuffer.length);
-                        return [2 /*return*/, "file://".concat(tempFile)];
+                        this.logger("desktopCapturer.getSources took ".concat(Date.now() - captureStart, "ms for ").concat(sources.length, " sources"));
+                        sortedDisplays = __spreadArray([], displays, true).sort(function (a, b) {
+                            // 先按 x 坐标排序，再按 y 坐标排序
+                            if (a.x !== b.x)
+                                return a.x - b.x;
+                            return a.y - b.y;
+                        });
+                        displays.forEach(function (display) {
+                            var source;
+                            if (sources.length === 1) {
+                                source = sources[0];
+                            }
+                            else {
+                                // 优先使用 display_id 匹配（Win10/11、macOS）
+                                source = sources.find(function (item) { return item.display_id && item.display_id === display.id.toString(); });
+                                // 如果 display_id 为空（Win7/Linux），使用 source.id 中的索引匹配
+                                if (!source) {
+                                    source = sources.find(function (item) { return item.id.startsWith("screen:".concat(display.id, ":")); });
+                                }
+                                // 最后回退：按位置顺序匹配（Win7 兼容）
+                                if (!source) {
+                                    var displayIndex = sortedDisplays.findIndex(function (d) { return d.id === display.id; });
+                                    if (displayIndex >= 0 && displayIndex < sources.length) {
+                                        // sources 通常按 screen:0:0, screen:1:0 顺序排列
+                                        var sortedSources = __spreadArray([], sources, true).sort(function (a, b) {
+                                            var aIndex = parseInt(a.id.split(':')[1] || '0', 10);
+                                            var bIndex = parseInt(b.id.split(':')[1] || '0', 10);
+                                            return aIndex - bIndex;
+                                        });
+                                        source = sortedSources[displayIndex];
+                                        _this.logger("Fallback matching: display ".concat(display.id, " (index ").concat(displayIndex, ") -> source ").concat(source === null || source === void 0 ? void 0 : source.id));
+                                    }
+                                }
+                            }
+                            if (source) {
+                                result.set(display.id, source.thumbnail.toDataURL());
+                            }
+                            else {
+                                _this.logger("No source found for display ".concat(display.id));
+                            }
+                        });
+                        this.logger("All captures completed in ".concat(Date.now() - captureStart, "ms"));
+                        return [2 /*return*/, result];
                 }
             });
         });

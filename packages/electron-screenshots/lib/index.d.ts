@@ -39,7 +39,18 @@ export default class Screenshots extends Events {
     private singleWindow;
     private useKiosk;
     private isReady;
+    private preloadedWins;
+    private preloadedViews;
+    private preloadReady;
     constructor(opts?: ScreenshotsOpts);
+    /**
+     * 预加载窗口（后台静默创建，不显示）
+     */
+    private preloadWindows;
+    /**
+     * 创建预加载窗口（隐藏状态）
+     */
+    private createPreloadWindow;
     private createReadyPromise;
     /**
      * 清理旧的临时文件
@@ -53,6 +64,18 @@ export default class Screenshots extends Events {
      * 开始截图
      */
     startCapture(): Promise<void>;
+    /**
+     * 显示窗口并发送截图数据
+     */
+    private showWindowWithCapture;
+    /**
+     * 快速创建窗口（简化版，用于回退场景）
+     */
+    private createWindowFast;
+    /**
+     * 确保预加载窗口已准备好
+     */
+    private ensureWindowsReady;
     /**
      * 结束截图
      */
@@ -73,7 +96,12 @@ export default class Screenshots extends Events {
      * 初始化窗口
      */
     private createWindow;
-    private capture;
+    private cachedSources;
+    private cachedSourcesTime;
+    /**
+     * 批量获取所有显示器的截图（一次 API 调用）
+     */
+    private captureAllDisplays;
     /**
      * 绑定ipc时间处理
      */
