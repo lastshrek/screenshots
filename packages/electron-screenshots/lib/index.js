@@ -900,7 +900,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, maxWidth, maxHeight, sources, sortedDisplays;
+            var captureStart, result, maxWidth, maxHeight, sources, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -916,12 +916,7 @@ var Screenshots = /** @class */ (function (_super) {
                     case 1:
                         sources = _a.sent();
                         this.logger("desktopCapturer.getSources took ".concat(Date.now() - captureStart, "ms for ").concat(sources.length, " sources"));
-                        sortedDisplays = __spreadArray([], displays, true).sort(function (a, b) {
-                            // 先按 x 坐标排序，再按 y 坐标排序
-                            if (a.x !== b.x)
-                                return a.x - b.x;
-                            return a.y - b.y;
-                        });
+                        usedSources = new Set();
                         displays.forEach(function (display) {
                             var source;
                             if (sources.length === 1) {
@@ -929,27 +924,33 @@ var Screenshots = /** @class */ (function (_super) {
                             }
                             else {
                                 // 优先使用 display_id 匹配（Win10/11、macOS）
-                                source = sources.find(function (item) { return item.display_id && item.display_id === display.id.toString(); });
+                                source = sources.find(function (item) { return !usedSources.has(item.id)
+                                    && item.display_id
+                                    && item.display_id === display.id.toString(); });
                                 // 如果 display_id 为空（Win7/Linux），使用 source.id 中的索引匹配
                                 if (!source) {
-                                    source = sources.find(function (item) { return item.id.startsWith("screen:".concat(display.id, ":")); });
+                                    source = sources.find(function (item) { return !usedSources.has(item.id)
+                                        && item.id.startsWith("screen:".concat(display.id, ":")); });
                                 }
-                                // 最后回退：按位置顺序匹配（Win7 兼容）
+                                // Win7 回退：根据主显示器判断
+                                // 在 Windows 上，screen:0:0 通常是主显示器（坐标 0,0 的那个）
                                 if (!source) {
-                                    var displayIndex = sortedDisplays.findIndex(function (d) { return d.id === display.id; });
-                                    if (displayIndex >= 0 && displayIndex < sources.length) {
-                                        // sources 通常按 screen:0:0, screen:1:0 顺序排列
-                                        var sortedSources = __spreadArray([], sources, true).sort(function (a, b) {
-                                            var aIndex = parseInt(a.id.split(':')[1] || '0', 10);
-                                            var bIndex = parseInt(b.id.split(':')[1] || '0', 10);
-                                            return aIndex - bIndex;
-                                        });
-                                        source = sortedSources[displayIndex];
-                                        _this.logger("Fallback matching: display ".concat(display.id, " (index ").concat(displayIndex, ") -> source ").concat(source === null || source === void 0 ? void 0 : source.id));
+                                    var isPrimaryDisplay = display.x === 0 && display.y === 0;
+                                    if (isPrimaryDisplay) {
+                                        // 主显示器匹配 screen:0:0
+                                        source = sources.find(function (item) { return !usedSources.has(item.id) && item.id === 'screen:0:0'; });
+                                    }
+                                    else {
+                                        // 非主显示器匹配其他 source
+                                        source = sources.find(function (item) { return !usedSources.has(item.id) && item.id !== 'screen:0:0'; });
+                                    }
+                                    if (source) {
+                                        _this.logger("Fallback matching: display ".concat(display.id, " (primary=").concat(isPrimaryDisplay, ", x=").concat(display.x, ", y=").concat(display.y, ") -> source ").concat(source.id));
                                     }
                                 }
                             }
                             if (source) {
+                                usedSources.add(source.id);
                                 result.set(display.id, source.thumbnail.toDataURL());
                             }
                             else {
