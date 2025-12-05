@@ -932,20 +932,26 @@ var Screenshots = /** @class */ (function (_super) {
                                     source = sources.find(function (item) { return !usedSources.has(item.id)
                                         && item.id.startsWith("screen:".concat(display.id, ":")); });
                                 }
-                                // Win7 回退：根据主显示器判断
-                                // 在 Windows 上，screen:0:0 通常是主显示器（坐标 0,0 的那个）
+                                // Win7 回退：尝试通过截图尺寸匹配
                                 if (!source) {
-                                    var isPrimaryDisplay = display.x === 0 && display.y === 0;
-                                    if (isPrimaryDisplay) {
-                                        // 主显示器匹配 screen:0:0
-                                        source = sources.find(function (item) { return !usedSources.has(item.id) && item.id === 'screen:0:0'; });
-                                    }
-                                    else {
-                                        // 非主显示器匹配其他 source
-                                        source = sources.find(function (item) { return !usedSources.has(item.id) && item.id !== 'screen:0:0'; });
+                                    var displayWidth_1 = Math.round(display.width * display.scaleFactor);
+                                    var displayHeight_1 = Math.round(display.height * display.scaleFactor);
+                                    // 尝试找尺寸匹配的 source
+                                    source = sources.find(function (item) {
+                                        if (usedSources.has(item.id))
+                                            return false;
+                                        var size = item.thumbnail.getSize();
+                                        // 允许一定误差（缩放可能导致几像素差异）
+                                        return Math.abs(size.width - displayWidth_1) < 10
+                                            && Math.abs(size.height - displayHeight_1) < 10;
+                                    });
+                                    // 如果尺寸匹配失败，使用剩余的第一个 source
+                                    if (!source) {
+                                        source = sources.find(function (item) { return !usedSources.has(item.id); });
                                     }
                                     if (source) {
-                                        _this.logger("Fallback matching: display ".concat(display.id, " (primary=").concat(isPrimaryDisplay, ", x=").concat(display.x, ", y=").concat(display.y, ") -> source ").concat(source.id));
+                                        var size = source.thumbnail.getSize();
+                                        _this.logger("Fallback matching: display ".concat(display.id, " (").concat(displayWidth_1, "x").concat(displayHeight_1, ") -> source ").concat(source.id, " (").concat(size.width, "x").concat(size.height, ")"));
                                     }
                                 }
                             }

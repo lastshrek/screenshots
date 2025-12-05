@@ -909,24 +909,29 @@ export default class Screenshots extends Events {
           );
         }
 
-        // Win7 回退：根据主显示器判断
-        // 在 Windows 上，screen:0:0 通常是主显示器（坐标 0,0 的那个）
+        // Win7 回退：尝试通过截图尺寸匹配
         if (!source) {
-          const isPrimaryDisplay = display.x === 0 && display.y === 0;
-          if (isPrimaryDisplay) {
-            // 主显示器匹配 screen:0:0
-            source = sources.find(
-              (item) => !usedSources.has(item.id) && item.id === 'screen:0:0',
-            );
-          } else {
-            // 非主显示器匹配其他 source
-            source = sources.find(
-              (item) => !usedSources.has(item.id) && item.id !== 'screen:0:0',
-            );
+          const displayWidth = Math.round(display.width * display.scaleFactor);
+          const displayHeight = Math.round(display.height * display.scaleFactor);
+
+          // 尝试找尺寸匹配的 source
+          source = sources.find((item) => {
+            if (usedSources.has(item.id)) return false;
+            const size = item.thumbnail.getSize();
+            // 允许一定误差（缩放可能导致几像素差异）
+            return Math.abs(size.width - displayWidth) < 10
+              && Math.abs(size.height - displayHeight) < 10;
+          });
+
+          // 如果尺寸匹配失败，使用剩余的第一个 source
+          if (!source) {
+            source = sources.find((item) => !usedSources.has(item.id));
           }
+
           if (source) {
+            const size = source.thumbnail.getSize();
             this.logger(
-              `Fallback matching: display ${display.id} (primary=${isPrimaryDisplay}, x=${display.x}, y=${display.y}) -> source ${source.id}`,
+              `Fallback matching: display ${display.id} (${displayWidth}x${displayHeight}) -> source ${source.id} (${size.width}x${size.height})`,
             );
           }
         }
