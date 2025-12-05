@@ -886,19 +886,52 @@ export default class Screenshots extends Events {
     this.logger(`desktopCapturer.getSources took ${Date.now() - captureStart}ms for ${sources.length} sources`);
 
     // 为每个显示器匹配对应的截图源
+    // 按显示器位置排序，与 sources 的顺序对应
+    const sortedDisplays = [...displays].sort((a, b) => {
+      // 先按 x 坐标排序，再按 y 坐标排序
+      if (a.x !== b.x) return a.x - b.x;
+      return a.y - b.y;
+    });
+
     displays.forEach((display) => {
       let source;
       if (sources.length === 1) {
         [source] = sources;
       } else {
+        // 优先使用 display_id 匹配（Win10/11、macOS）
         source = sources.find(
-          (item) => item.display_id === display.id.toString()
-            || item.id.startsWith(`screen:${display.id}:`),
+          (item) => item.display_id && item.display_id === display.id.toString(),
         );
+
+        // 如果 display_id 为空（Win7/Linux），使用 source.id 中的索引匹配
+        if (!source) {
+          source = sources.find(
+            (item) => item.id.startsWith(`screen:${display.id}:`),
+          );
+        }
+
+        // 最后回退：按位置顺序匹配（Win7 兼容）
+        if (!source) {
+          const displayIndex = sortedDisplays.findIndex((d) => d.id === display.id);
+          if (displayIndex >= 0 && displayIndex < sources.length) {
+            // sources 通常按 screen:0:0, screen:1:0 顺序排列
+            const sortedSources = [...sources].sort((a, b) => {
+              const aIndex = parseInt(a.id.split(':')[1] || '0', 10);
+              const bIndex = parseInt(b.id.split(':')[1] || '0', 10);
+              return aIndex - bIndex;
+            });
+            source = sortedSources[displayIndex];
+            this.logger(
+              `Fallback matching: display ${display.id} (index ${displayIndex}) -> source ${source?.id}`,
+            );
+          }
+        }
       }
 
       if (source) {
         result.set(display.id, source.thumbnail.toDataURL());
+      } else {
+        this.logger(`No source found for display ${display.id}`);
       }
     });
 
