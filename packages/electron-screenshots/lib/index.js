@@ -287,6 +287,8 @@ var Screenshots = /** @class */ (function (_super) {
     };
     /**
      * 检查屏幕录制权限
+     * 注意：macOS 的权限状态可能有缓存，即使用户已授权，状态也可能不会立即更新
+     * 因此这个方法只做日志记录，不阻止截图操作
      */
     Screenshots.prototype.checkScreenRecordingPermission = function () {
         if (process.platform !== 'darwin') {
@@ -295,10 +297,22 @@ var Screenshots = /** @class */ (function (_super) {
         }
         var status = electron_1.systemPreferences.getMediaAccessStatus('screen');
         this.logger('Screen recording permission status:', status);
-        // 允许 'granted' 和 'not-determined' 状态
-        // 'not-determined' 时系统会在首次截图时自动弹出权限请求
-        // 只有明确 'denied' 或 'restricted' 时才阻止
-        return status !== 'denied' && status !== 'restricted';
+        // macOS 权限状态说明：
+        // - 'granted': 已授权
+        // - 'denied': 用户明确拒绝
+        // - 'restricted': 系统限制（如家长控制）
+        // - 'not-determined': 尚未请求过权限
+        //
+        // 重要：即使状态显示 'denied'，也不应该阻止截图尝试，因为：
+        // 1. 权限状态可能有缓存，用户授权后状态不会立即更新
+        // 2. desktopCapturer.getSources() 会触发系统权限请求
+        // 3. 让实际的截图操作去验证权限更可靠
+        if (status === 'denied' || status === 'restricted') {
+            this.logger('Warning: Screen recording permission appears to be denied/restricted. '
+                + 'If you have already granted permission, try restarting the application.');
+        }
+        // 始终返回 true，让实际截图操作去验证权限
+        return true;
     };
     /**
      * 开始截图
@@ -312,10 +326,9 @@ var Screenshots = /** @class */ (function (_super) {
                     case 0:
                         this.logger('startCapture');
                         startTime = Date.now();
-                        // 检查屏幕录制权限（仅 macOS）
-                        if (process.platform === 'darwin' && !this.checkScreenRecordingPermission()) {
-                            this.logger('Screen recording permission denied');
-                            throw new Error('Screen recording permission was denied. Please grant permission in System Preferences > Privacy & Security > Screen Recording, then restart the application.');
+                        // 检查屏幕录制权限（仅 macOS，仅做日志记录，不阻止截图）
+                        if (process.platform === 'darwin') {
+                            this.checkScreenRecordingPermission();
                         }
                         // 注册全局 ESC 快捷键，确保能退出
                         electron_1.globalShortcut.register('Esc', function () {

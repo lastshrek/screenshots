@@ -58,6 +58,8 @@ export default class Screenshots extends Events {
     private cleanupOldTempFiles;
     /**
      * 检查屏幕录制权限
+     * 注意：macOS 的权限状态可能有缓存，即使用户已授权，状态也可能不会立即更新
+     * 因此这个方法只做日志记录，不阻止截图操作
      */
     private checkScreenRecordingPermission;
     /**
