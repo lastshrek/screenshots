@@ -925,7 +925,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, maxWidth, maxHeight, sources, err_3, usedSources;
+            var captureStart, result, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -940,34 +940,76 @@ var Screenshots = /** @class */ (function (_super) {
                         maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
                         maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
                         this.logger("[Capture] Max thumbnail size: ".concat(maxWidth, "x").concat(maxHeight));
-                        // 一次性获取所有屏幕截图
+                        // 一次性获取所有屏幕截图（带重试机制）
                         this.logger('[Capture] Calling desktopCapturer.getSources...');
                         sources = [];
-                        _a.label = 1;
+                        maxRetries = 3;
+                        retryDelay = 500;
+                        attemptCapture = function (attempt) { return __awaiter(_this, void 0, void 0, function () {
+                            var attemptStart, hasValidData, err_3;
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        _a.trys.push([0, 2, , 3]);
+                                        attemptStart = Date.now();
+                                        return [4 /*yield*/, electron_1.desktopCapturer.getSources({
+                                                types: ['screen'],
+                                                thumbnailSize: { width: maxWidth, height: maxHeight },
+                                            })];
+                                    case 1:
+                                        sources = _a.sent();
+                                        this.logger("[Capture] Attempt ".concat(attempt, ": desktopCapturer.getSources returned ").concat(sources.length, " sources in ").concat(Date.now() - attemptStart, "ms"));
+                                        hasValidData = sources.length > 0 && sources.some(function (s) { return !s.thumbnail.isEmpty(); });
+                                        if (hasValidData) {
+                                            this.logger("[Capture] \u2705 Got valid capture data on attempt ".concat(attempt));
+                                            return [2 /*return*/, true];
+                                        }
+                                        // 没有有效数据，可能是首次权限请求
+                                        this.logger("[Capture] \u26A0\uFE0F Attempt ".concat(attempt, ": No valid data"));
+                                        this.logger('[Capture] (This is normal for first-time permission request on macOS)');
+                                        return [2 /*return*/, false];
+                                    case 2:
+                                        err_3 = _a.sent();
+                                        this.logger("[Capture] \u274C Attempt ".concat(attempt, ": desktopCapturer.getSources FAILED:"), err_3);
+                                        if (attempt === maxRetries) {
+                                            throw err_3;
+                                        }
+                                        return [2 /*return*/, false];
+                                    case 3: return [2 /*return*/];
+                                }
+                            });
+                        }); };
+                        delay = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
+                        return [4 /*yield*/, attemptCapture(1)];
                     case 1:
-                        _a.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, electron_1.desktopCapturer.getSources({
-                                types: ['screen'],
-                                thumbnailSize: { width: maxWidth, height: maxHeight },
-                            })];
+                        success = _a.sent();
+                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 4];
+                        return [4 /*yield*/, delay(retryDelay)];
                     case 2:
-                        sources = _a.sent();
-                        this.logger("[Capture] desktopCapturer.getSources returned ".concat(sources.length, " sources in ").concat(Date.now() - captureStart, "ms"));
-                        return [3 /*break*/, 4];
+                        _a.sent();
+                        return [4 /*yield*/, attemptCapture(2)];
                     case 3:
-                        err_3 = _a.sent();
-                        this.logger('[Capture] ❌ desktopCapturer.getSources FAILED:', err_3);
-                        throw err_3;
+                        success = _a.sent();
+                        _a.label = 4;
                     case 4:
+                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 7];
+                        return [4 /*yield*/, delay(retryDelay)];
+                    case 5:
+                        _a.sent();
+                        return [4 /*yield*/, attemptCapture(3)];
+                    case 6:
+                        _a.sent();
+                        _a.label = 7;
+                    case 7:
                         // 打印每个 source 的详细信息
                         sources.forEach(function (s, i) {
                             var size = s.thumbnail.getSize();
                             _this.logger("[Capture] Source ".concat(i, ": id=").concat(s.id, ", display_id=").concat(s.display_id, ", name=").concat(s.name, ", size=").concat(size.width, "x").concat(size.height, ", isEmpty=").concat(s.thumbnail.isEmpty()));
                         });
-                        if (sources.length === 0) {
-                            this.logger('[Capture] ⚠️ No sources returned! This usually means:');
+                        if (sources.length === 0 || sources.every(function (s) { return s.thumbnail.isEmpty(); })) {
+                            this.logger('[Capture] ⚠️ No valid sources after all retries! This usually means:');
                             this.logger('[Capture]   1. Screen recording permission is not granted');
-                            this.logger('[Capture]   2. Or the permission status is cached and needs app restart');
+                            this.logger('[Capture]   2. User needs to grant permission and restart the app');
                         }
                         usedSources = new Set();
                         displays.forEach(function (display) {

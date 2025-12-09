@@ -913,18 +913,55 @@ export default class Screenshots extends Events {
     const maxHeight = Math.max(...displays.map((d) => d.height * d.scaleFactor));
     this.logger(`[Capture] Max thumbnail size: ${maxWidth}x${maxHeight}`);
 
-    // 一次性获取所有屏幕截图
+    // 一次性获取所有屏幕截图（带重试机制）
     this.logger('[Capture] Calling desktopCapturer.getSources...');
     let sources: Electron.DesktopCapturerSource[] = [];
-    try {
-      sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width: maxWidth, height: maxHeight },
-      });
-      this.logger(`[Capture] desktopCapturer.getSources returned ${sources.length} sources in ${Date.now() - captureStart}ms`);
-    } catch (err) {
-      this.logger('[Capture] ❌ desktopCapturer.getSources FAILED:', err);
-      throw err;
+    const maxRetries = 3;
+    const retryDelay = 500; // ms
+
+    // 定义重试函数
+    const attemptCapture = async (attempt: number): Promise<boolean> => {
+      try {
+        const attemptStart = Date.now();
+        sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width: maxWidth, height: maxHeight },
+        });
+        this.logger(`[Capture] Attempt ${attempt}: desktopCapturer.getSources returned ${sources.length} sources in ${Date.now() - attemptStart}ms`);
+
+        // 检查是否有有效的截图数据
+        const hasValidData = sources.length > 0 && sources.some((s) => !s.thumbnail.isEmpty());
+
+        if (hasValidData) {
+          this.logger(`[Capture] ✅ Got valid capture data on attempt ${attempt}`);
+          return true;
+        }
+
+        // 没有有效数据，可能是首次权限请求
+        this.logger(`[Capture] ⚠️ Attempt ${attempt}: No valid data`);
+        this.logger('[Capture] (This is normal for first-time permission request on macOS)');
+        return false;
+      } catch (err) {
+        this.logger(`[Capture] ❌ Attempt ${attempt}: desktopCapturer.getSources FAILED:`, err);
+        if (attempt === maxRetries) {
+          throw err;
+        }
+        return false;
+      }
+    };
+
+    // 延迟函数
+    const delay = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+    // 执行重试
+    let success = await attemptCapture(1);
+    if (!success && maxRetries >= 2) {
+      await delay(retryDelay);
+      success = await attemptCapture(2);
+    }
+    if (!success && maxRetries >= 3) {
+      await delay(retryDelay);
+      await attemptCapture(3);
     }
 
     // 打印每个 source 的详细信息
@@ -933,10 +970,10 @@ export default class Screenshots extends Events {
       this.logger(`[Capture] Source ${i}: id=${s.id}, display_id=${s.display_id}, name=${s.name}, size=${size.width}x${size.height}, isEmpty=${s.thumbnail.isEmpty()}`);
     });
 
-    if (sources.length === 0) {
-      this.logger('[Capture] ⚠️ No sources returned! This usually means:');
+    if (sources.length === 0 || sources.every((s) => s.thumbnail.isEmpty())) {
+      this.logger('[Capture] ⚠️ No valid sources after all retries! This usually means:');
       this.logger('[Capture]   1. Screen recording permission is not granted');
-      this.logger('[Capture]   2. Or the permission status is cached and needs app restart');
+      this.logger('[Capture]   2. User needs to grant permission and restart the app');
     }
 
     // 为每个显示器匹配对应的截图源
