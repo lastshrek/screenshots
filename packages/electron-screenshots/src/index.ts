@@ -912,6 +912,52 @@ export default class Screenshots extends Events {
   private cachedSourcesTime: number = 0;
 
   /**
+   * macOS 原生截图（使用 screencapture 命令，速度更快）
+   */
+  private async captureWithNativeCommand(displays: Display[]): Promise<Map<number, string>> {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+
+    const captureStart = Date.now();
+    const result = new Map<number, string>();
+    const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+    await fs.ensureDir(tempDir);
+
+    this.logger('[Capture] Using native screencapture command...');
+
+    // 为每个显示器截图
+    const capturePromises = displays.map(async (display, index) => {
+      const tempFile = path.join(tempDir, `capture-${display.id}-${Date.now()}.png`);
+      this.tempFiles.add(tempFile);
+
+      try {
+        // -x: 静音（不播放快门声）
+        // -D: 指定显示器（从1开始）
+        // -t png: 输出格式
+        await execFileAsync('screencapture', ['-x', '-D', String(index + 1), '-t', 'png', tempFile]);
+
+        const imageBuffer = await fs.readFile(tempFile);
+        const image = nativeImage.createFromBuffer(imageBuffer);
+
+        if (!image.isEmpty()) {
+          result.set(display.id, image.toDataURL());
+          this.logger(`[Capture] ✅ Native capture for display ${display.id} succeeded`);
+        } else {
+          this.logger(`[Capture] ⚠️ Native capture for display ${display.id} returned empty image`);
+        }
+      } catch (err) {
+        this.logger(`[Capture] ❌ Native capture for display ${display.id} failed:`, err);
+      }
+    });
+
+    await Promise.all(capturePromises);
+    this.logger(`[Capture] Native capture completed in ${Date.now() - captureStart}ms`);
+
+    return result;
+  }
+
+  /**
    * 批量获取所有显示器的截图（一次 API 调用）
    */
   private async captureAllDisplays(displays: Display[]): Promise<Map<number, string>> {
@@ -923,6 +969,21 @@ export default class Screenshots extends Events {
     displays.forEach((d, i) => {
       this.logger(`[Capture] Display ${i}: id=${d.id}, ${d.width}x${d.height}, scale=${d.scaleFactor}`);
     });
+
+    // macOS: 优先使用原生命令截图（更快）
+    if (process.platform === 'darwin') {
+      try {
+        const nativeResult = await this.captureWithNativeCommand(displays);
+        if (nativeResult.size === displays.length) {
+          this.logger(`[Capture] All captures completed in ${Date.now() - captureStart}ms (native)`);
+          this.logger('[Capture] =============================================');
+          return nativeResult;
+        }
+        this.logger('[Capture] Native capture incomplete, falling back to desktopCapturer...');
+      } catch (err) {
+        this.logger('[Capture] Native capture failed, falling back to desktopCapturer:', err);
+      }
+    }
 
     // 找出最大的屏幕尺寸，用于 thumbnailSize
     const maxWidth = Math.max(...displays.map((d) => d.width * d.scaleFactor));

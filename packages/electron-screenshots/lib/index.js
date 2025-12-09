@@ -14,6 +14,29 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -934,11 +957,82 @@ var Screenshots = /** @class */ (function (_super) {
         });
     };
     /**
+     * macOS 原生截图（使用 screencapture 命令，速度更快）
+     */
+    Screenshots.prototype.captureWithNativeCommand = function (displays) {
+        return __awaiter(this, void 0, void 0, function () {
+            var execFile, promisify, execFileAsync, captureStart, result, tempDir, capturePromises;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('child_process')); })];
+                    case 1:
+                        execFile = (_a.sent()).execFile;
+                        return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('util')); })];
+                    case 2:
+                        promisify = (_a.sent()).promisify;
+                        execFileAsync = promisify(execFile);
+                        captureStart = Date.now();
+                        result = new Map();
+                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                        return [4 /*yield*/, fs_extra_1.default.ensureDir(tempDir)];
+                    case 3:
+                        _a.sent();
+                        this.logger('[Capture] Using native screencapture command...');
+                        capturePromises = displays.map(function (display, index) { return __awaiter(_this, void 0, void 0, function () {
+                            var tempFile, imageBuffer, image, err_3;
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".png"));
+                                        this.tempFiles.add(tempFile);
+                                        _a.label = 1;
+                                    case 1:
+                                        _a.trys.push([1, 4, , 5]);
+                                        // -x: 静音（不播放快门声）
+                                        // -D: 指定显示器（从1开始）
+                                        // -t png: 输出格式
+                                        return [4 /*yield*/, execFileAsync('screencapture', ['-x', '-D', String(index + 1), '-t', 'png', tempFile])];
+                                    case 2:
+                                        // -x: 静音（不播放快门声）
+                                        // -D: 指定显示器（从1开始）
+                                        // -t png: 输出格式
+                                        _a.sent();
+                                        return [4 /*yield*/, fs_extra_1.default.readFile(tempFile)];
+                                    case 3:
+                                        imageBuffer = _a.sent();
+                                        image = electron_1.nativeImage.createFromBuffer(imageBuffer);
+                                        if (!image.isEmpty()) {
+                                            result.set(display.id, image.toDataURL());
+                                            this.logger("[Capture] \u2705 Native capture for display ".concat(display.id, " succeeded"));
+                                        }
+                                        else {
+                                            this.logger("[Capture] \u26A0\uFE0F Native capture for display ".concat(display.id, " returned empty image"));
+                                        }
+                                        return [3 /*break*/, 5];
+                                    case 4:
+                                        err_3 = _a.sent();
+                                        this.logger("[Capture] \u274C Native capture for display ".concat(display.id, " failed:"), err_3);
+                                        return [3 /*break*/, 5];
+                                    case 5: return [2 /*return*/];
+                                }
+                            });
+                        }); });
+                        return [4 /*yield*/, Promise.all(capturePromises)];
+                    case 4:
+                        _a.sent();
+                        this.logger("[Capture] Native capture completed in ".concat(Date.now() - captureStart, "ms"));
+                        return [2 /*return*/, result];
+                }
+            });
+        });
+    };
+    /**
      * 批量获取所有显示器的截图（一次 API 调用）
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
+            var captureStart, result, nativeResult, err_4, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -950,6 +1044,25 @@ var Screenshots = /** @class */ (function (_super) {
                         displays.forEach(function (d, i) {
                             _this.logger("[Capture] Display ".concat(i, ": id=").concat(d.id, ", ").concat(d.width, "x").concat(d.height, ", scale=").concat(d.scaleFactor));
                         });
+                        if (!(process.platform === 'darwin')) return [3 /*break*/, 4];
+                        _a.label = 1;
+                    case 1:
+                        _a.trys.push([1, 3, , 4]);
+                        return [4 /*yield*/, this.captureWithNativeCommand(displays)];
+                    case 2:
+                        nativeResult = _a.sent();
+                        if (nativeResult.size === displays.length) {
+                            this.logger("[Capture] All captures completed in ".concat(Date.now() - captureStart, "ms (native)"));
+                            this.logger('[Capture] =============================================');
+                            return [2 /*return*/, nativeResult];
+                        }
+                        this.logger('[Capture] Native capture incomplete, falling back to desktopCapturer...');
+                        return [3 /*break*/, 4];
+                    case 3:
+                        err_4 = _a.sent();
+                        this.logger('[Capture] Native capture failed, falling back to desktopCapturer:', err_4);
+                        return [3 /*break*/, 4];
+                    case 4:
                         maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
                         maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
                         this.logger("[Capture] Max thumbnail size: ".concat(maxWidth, "x").concat(maxHeight));
@@ -959,7 +1072,7 @@ var Screenshots = /** @class */ (function (_super) {
                         maxRetries = 3;
                         retryDelay = 500;
                         attemptCapture = function (attempt) { return __awaiter(_this, void 0, void 0, function () {
-                            var attemptStart, hasValidData, err_3;
+                            var attemptStart, hasValidData, err_5;
                             return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0:
@@ -982,10 +1095,10 @@ var Screenshots = /** @class */ (function (_super) {
                                         this.logger('[Capture] (This is normal for first-time permission request on macOS)');
                                         return [2 /*return*/, false];
                                     case 2:
-                                        err_3 = _a.sent();
-                                        this.logger("[Capture] \u274C Attempt ".concat(attempt, ": desktopCapturer.getSources FAILED:"), err_3);
+                                        err_5 = _a.sent();
+                                        this.logger("[Capture] \u274C Attempt ".concat(attempt, ": desktopCapturer.getSources FAILED:"), err_5);
                                         if (attempt === maxRetries) {
-                                            throw err_3;
+                                            throw err_5;
                                         }
                                         return [2 /*return*/, false];
                                     case 3: return [2 /*return*/];
@@ -994,26 +1107,26 @@ var Screenshots = /** @class */ (function (_super) {
                         }); };
                         delay = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
                         return [4 /*yield*/, attemptCapture(1)];
-                    case 1:
-                        success = _a.sent();
-                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 4];
-                        return [4 /*yield*/, delay(retryDelay)];
-                    case 2:
-                        _a.sent();
-                        return [4 /*yield*/, attemptCapture(2)];
-                    case 3:
-                        success = _a.sent();
-                        _a.label = 4;
-                    case 4:
-                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 7];
-                        return [4 /*yield*/, delay(retryDelay)];
                     case 5:
-                        _a.sent();
-                        return [4 /*yield*/, attemptCapture(3)];
+                        success = _a.sent();
+                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 8];
+                        return [4 /*yield*/, delay(retryDelay)];
                     case 6:
                         _a.sent();
-                        _a.label = 7;
+                        return [4 /*yield*/, attemptCapture(2)];
                     case 7:
+                        success = _a.sent();
+                        _a.label = 8;
+                    case 8:
+                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 11];
+                        return [4 /*yield*/, delay(retryDelay)];
+                    case 9:
+                        _a.sent();
+                        return [4 /*yield*/, attemptCapture(3)];
+                    case 10:
+                        _a.sent();
+                        _a.label = 11;
+                    case 11:
                         // 打印每个 source 的详细信息
                         sources.forEach(function (s, i) {
                             var size = s.thumbnail.getSize();

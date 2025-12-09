@@ -101,6 +101,10 @@ export default class Screenshots extends Events {
     private cachedSources;
     private cachedSourcesTime;
     /**
+     * macOS 原生截图（使用 screencapture 命令，速度更快）
+     */
+    private captureWithNativeCommand;
+    /**
      * 批量获取所有显示器的截图（一次 API 调用）
      */
     private captureAllDisplays;
