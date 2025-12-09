@@ -181,9 +181,13 @@ var Screenshots = /** @class */ (function (_super) {
                     hasShadow: false,
                     paintWhenInitiallyHidden: true,
                     roundedCorners: false,
-                    enableLargerThanScreen: false,
+                    enableLargerThanScreen: true,
                     acceptFirstMouse: true,
                 });
+                // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+                if (process.platform === 'darwin') {
+                    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                }
                 view = new electron_1.BrowserView({
                     webPreferences: {
                         preload: require.resolve('./preload.js'),
@@ -456,7 +460,12 @@ var Screenshots = /** @class */ (function (_super) {
             backgroundColor: '#00000001',
             titleBarStyle: 'hidden',
             hasShadow: false,
+            enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
         });
+        // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+        if (process.platform === 'darwin') {
+            win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        }
         var view = new electron_1.BrowserView({
             webPreferences: {
                 preload: require.resolve('./preload.js'),
@@ -764,9 +773,13 @@ var Screenshots = /** @class */ (function (_super) {
                                 paintWhenInitiallyHidden: false,
                                 // mac 特有的属性
                                 roundedCorners: false,
-                                enableLargerThanScreen: false,
+                                enableLargerThanScreen: true,
                                 acceptFirstMouse: true,
                             });
+                            // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+                            if (process.platform === 'darwin') {
+                                win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                            }
                             this.$wins.set(display.id, win);
                             this.emit('windowCreated', win);
                             win.on('show', function () {

@@ -158,9 +158,14 @@ export default class Screenshots extends Events {
       hasShadow: false,
       paintWhenInitiallyHidden: true, // 允许后台渲染
       roundedCorners: false,
-      enableLargerThanScreen: false,
+      enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
       acceptFirstMouse: true,
     });
+
+    // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+    if (process.platform === 'darwin') {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
 
     const view = new BrowserView({
       webPreferences: {
@@ -432,7 +437,13 @@ export default class Screenshots extends Events {
       backgroundColor: '#00000001',
       titleBarStyle: 'hidden',
       hasShadow: false,
+      enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
     });
+
+    // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+    if (process.platform === 'darwin') {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
 
     const view = new BrowserView({
       webPreferences: {
@@ -686,9 +697,14 @@ export default class Screenshots extends Events {
         paintWhenInitiallyHidden: false,
         // mac 特有的属性
         roundedCorners: false,
-        enableLargerThanScreen: false,
+        enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
         acceptFirstMouse: true,
       });
+
+      // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
+      if (process.platform === 'darwin') {
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      }
 
       this.$wins.set(display.id, win);
 
