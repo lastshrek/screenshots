@@ -1107,9 +1107,16 @@ export default class Screenshots extends Events {
 
       if (source) {
         usedSources.add(source.id);
-        const dataUrl = source.thumbnail.toDataURL();
-        result.set(display.id, dataUrl);
-        this.logger(`[Capture] ✅ Display ${display.id} matched to source ${source.id}, dataUrl length: ${dataUrl.length}`);
+        // 使用临时文件代替 dataURL，避免大图片 base64 转换耗时
+        const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+        fs.ensureDirSync(tempDir);
+        const tempFile = path.join(tempDir, `capture-${display.id}-${Date.now()}.png`);
+        const convertStart = Date.now();
+        fs.writeFileSync(tempFile, source.thumbnail.toPNG());
+        this.tempFiles.add(tempFile);
+        const fileUrl = `file://${tempFile}`;
+        result.set(display.id, fileUrl);
+        this.logger(`[Capture] ✅ Display ${display.id} -> ${source.id}, saved in ${Date.now() - convertStart}ms`);
       } else {
         this.logger(`[Capture] ❌ No source found for display ${display.id}`);
       }

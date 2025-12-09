@@ -1169,9 +1169,16 @@ var Screenshots = /** @class */ (function (_super) {
                             }
                             if (source) {
                                 usedSources.add(source.id);
-                                var dataUrl = source.thumbnail.toDataURL();
-                                result.set(display.id, dataUrl);
-                                _this.logger("[Capture] \u2705 Display ".concat(display.id, " matched to source ").concat(source.id, ", dataUrl length: ").concat(dataUrl.length));
+                                // 使用临时文件代替 dataURL，避免大图片 base64 转换耗时
+                                var tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                                fs_extra_1.default.ensureDirSync(tempDir);
+                                var tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".png"));
+                                var convertStart = Date.now();
+                                fs_extra_1.default.writeFileSync(tempFile, source.thumbnail.toPNG());
+                                _this.tempFiles.add(tempFile);
+                                var fileUrl = "file://".concat(tempFile);
+                                result.set(display.id, fileUrl);
+                                _this.logger("[Capture] \u2705 Display ".concat(display.id, " -> ").concat(source.id, ", saved in ").concat(Date.now() - convertStart, "ms"));
                             }
                             else {
                                 _this.logger("[Capture] \u274C No source found for display ".concat(display.id));
