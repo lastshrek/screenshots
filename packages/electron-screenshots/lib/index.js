@@ -293,10 +293,15 @@ var Screenshots = /** @class */ (function (_super) {
     Screenshots.prototype.checkScreenRecordingPermission = function () {
         if (process.platform !== 'darwin') {
             // 非 macOS 平台不需要检查
+            this.logger('[Permission] Not macOS, skipping permission check');
             return true;
         }
+        this.logger('[Permission] ========== macOS Permission Check ==========');
+        this.logger('[Permission] Platform:', process.platform);
+        this.logger('[Permission] Electron version:', process.versions.electron);
+        this.logger('[Permission] Node version:', process.versions.node);
         var status = electron_1.systemPreferences.getMediaAccessStatus('screen');
-        this.logger('Screen recording permission status:', status);
+        this.logger('[Permission] Screen recording status:', status);
         // macOS 权限状态说明：
         // - 'granted': 已授权
         // - 'denied': 用户明确拒绝
@@ -308,9 +313,16 @@ var Screenshots = /** @class */ (function (_super) {
         // 2. desktopCapturer.getSources() 会触发系统权限请求
         // 3. 让实际的截图操作去验证权限更可靠
         if (status === 'denied' || status === 'restricted') {
-            this.logger('Warning: Screen recording permission appears to be denied/restricted. '
-                + 'If you have already granted permission, try restarting the application.');
+            this.logger('[Permission] ⚠️ Warning: Screen recording permission appears to be denied/restricted.');
+            this.logger('[Permission] If you have already granted permission, try restarting the application.');
         }
+        else if (status === 'granted') {
+            this.logger('[Permission] ✅ Screen recording permission granted');
+        }
+        else if (status === 'not-determined') {
+            this.logger('[Permission] ℹ️ Screen recording permission not yet requested');
+        }
+        this.logger('[Permission] ==========================================');
         // 始终返回 true，让实际截图操作去验证权限
         return true;
     };
@@ -913,22 +925,50 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, maxWidth, maxHeight, sources, usedSources;
+            var captureStart, result, maxWidth, maxHeight, sources, err_3, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         captureStart = Date.now();
                         result = new Map();
+                        this.logger('[Capture] ========== Starting Screen Capture ==========');
+                        this.logger('[Capture] Number of displays:', displays.length);
+                        displays.forEach(function (d, i) {
+                            _this.logger("[Capture] Display ".concat(i, ": id=").concat(d.id, ", ").concat(d.width, "x").concat(d.height, ", scale=").concat(d.scaleFactor));
+                        });
                         maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
                         maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
+                        this.logger("[Capture] Max thumbnail size: ".concat(maxWidth, "x").concat(maxHeight));
+                        // 一次性获取所有屏幕截图
+                        this.logger('[Capture] Calling desktopCapturer.getSources...');
+                        sources = [];
+                        _a.label = 1;
+                    case 1:
+                        _a.trys.push([1, 3, , 4]);
                         return [4 /*yield*/, electron_1.desktopCapturer.getSources({
                                 types: ['screen'],
                                 thumbnailSize: { width: maxWidth, height: maxHeight },
                             })];
-                    case 1:
+                    case 2:
                         sources = _a.sent();
-                        this.logger("desktopCapturer.getSources took ".concat(Date.now() - captureStart, "ms for ").concat(sources.length, " sources"));
+                        this.logger("[Capture] desktopCapturer.getSources returned ".concat(sources.length, " sources in ").concat(Date.now() - captureStart, "ms"));
+                        return [3 /*break*/, 4];
+                    case 3:
+                        err_3 = _a.sent();
+                        this.logger('[Capture] ❌ desktopCapturer.getSources FAILED:', err_3);
+                        throw err_3;
+                    case 4:
+                        // 打印每个 source 的详细信息
+                        sources.forEach(function (s, i) {
+                            var size = s.thumbnail.getSize();
+                            _this.logger("[Capture] Source ".concat(i, ": id=").concat(s.id, ", display_id=").concat(s.display_id, ", name=").concat(s.name, ", size=").concat(size.width, "x").concat(size.height, ", isEmpty=").concat(s.thumbnail.isEmpty()));
+                        });
+                        if (sources.length === 0) {
+                            this.logger('[Capture] ⚠️ No sources returned! This usually means:');
+                            this.logger('[Capture]   1. Screen recording permission is not granted');
+                            this.logger('[Capture]   2. Or the permission status is cached and needs app restart');
+                        }
                         usedSources = new Set();
                         displays.forEach(function (display) {
                             var source;
@@ -970,13 +1010,17 @@ var Screenshots = /** @class */ (function (_super) {
                             }
                             if (source) {
                                 usedSources.add(source.id);
-                                result.set(display.id, source.thumbnail.toDataURL());
+                                var dataUrl = source.thumbnail.toDataURL();
+                                result.set(display.id, dataUrl);
+                                _this.logger("[Capture] \u2705 Display ".concat(display.id, " matched to source ").concat(source.id, ", dataUrl length: ").concat(dataUrl.length));
                             }
                             else {
-                                _this.logger("No source found for display ".concat(display.id));
+                                _this.logger("[Capture] \u274C No source found for display ".concat(display.id));
                             }
                         });
-                        this.logger("All captures completed in ".concat(Date.now() - captureStart, "ms"));
+                        this.logger("[Capture] Total captures: ".concat(result.size, "/").concat(displays.length));
+                        this.logger("[Capture] All captures completed in ".concat(Date.now() - captureStart, "ms"));
+                        this.logger('[Capture] =============================================');
                         return [2 /*return*/, result];
                 }
             });

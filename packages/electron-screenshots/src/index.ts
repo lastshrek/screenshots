@@ -255,11 +255,17 @@ export default class Screenshots extends Events {
   private checkScreenRecordingPermission(): boolean {
     if (process.platform !== 'darwin') {
       // 非 macOS 平台不需要检查
+      this.logger('[Permission] Not macOS, skipping permission check');
       return true;
     }
 
+    this.logger('[Permission] ========== macOS Permission Check ==========');
+    this.logger('[Permission] Platform:', process.platform);
+    this.logger('[Permission] Electron version:', process.versions.electron);
+    this.logger('[Permission] Node version:', process.versions.node);
+
     const status = systemPreferences.getMediaAccessStatus('screen');
-    this.logger('Screen recording permission status:', status);
+    this.logger('[Permission] Screen recording status:', status);
 
     // macOS 权限状态说明：
     // - 'granted': 已授权
@@ -274,10 +280,18 @@ export default class Screenshots extends Events {
 
     if (status === 'denied' || status === 'restricted') {
       this.logger(
-        'Warning: Screen recording permission appears to be denied/restricted. '
-        + 'If you have already granted permission, try restarting the application.',
+        '[Permission] ⚠️ Warning: Screen recording permission appears to be denied/restricted.',
       );
+      this.logger(
+        '[Permission] If you have already granted permission, try restarting the application.',
+      );
+    } else if (status === 'granted') {
+      this.logger('[Permission] ✅ Screen recording permission granted');
+    } else if (status === 'not-determined') {
+      this.logger('[Permission] ℹ️ Screen recording permission not yet requested');
     }
+
+    this.logger('[Permission] ==========================================');
 
     // 始终返回 true，让实际截图操作去验证权限
     return true;
@@ -888,17 +902,42 @@ export default class Screenshots extends Events {
     const captureStart = Date.now();
     const result = new Map<number, string>();
 
+    this.logger('[Capture] ========== Starting Screen Capture ==========');
+    this.logger('[Capture] Number of displays:', displays.length);
+    displays.forEach((d, i) => {
+      this.logger(`[Capture] Display ${i}: id=${d.id}, ${d.width}x${d.height}, scale=${d.scaleFactor}`);
+    });
+
     // 找出最大的屏幕尺寸，用于 thumbnailSize
     const maxWidth = Math.max(...displays.map((d) => d.width * d.scaleFactor));
     const maxHeight = Math.max(...displays.map((d) => d.height * d.scaleFactor));
+    this.logger(`[Capture] Max thumbnail size: ${maxWidth}x${maxHeight}`);
 
     // 一次性获取所有屏幕截图
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width: maxWidth, height: maxHeight },
+    this.logger('[Capture] Calling desktopCapturer.getSources...');
+    let sources: Electron.DesktopCapturerSource[] = [];
+    try {
+      sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: maxWidth, height: maxHeight },
+      });
+      this.logger(`[Capture] desktopCapturer.getSources returned ${sources.length} sources in ${Date.now() - captureStart}ms`);
+    } catch (err) {
+      this.logger('[Capture] ❌ desktopCapturer.getSources FAILED:', err);
+      throw err;
+    }
+
+    // 打印每个 source 的详细信息
+    sources.forEach((s, i) => {
+      const size = s.thumbnail.getSize();
+      this.logger(`[Capture] Source ${i}: id=${s.id}, display_id=${s.display_id}, name=${s.name}, size=${size.width}x${size.height}, isEmpty=${s.thumbnail.isEmpty()}`);
     });
 
-    this.logger(`desktopCapturer.getSources took ${Date.now() - captureStart}ms for ${sources.length} sources`);
+    if (sources.length === 0) {
+      this.logger('[Capture] ⚠️ No sources returned! This usually means:');
+      this.logger('[Capture]   1. Screen recording permission is not granted');
+      this.logger('[Capture]   2. Or the permission status is cached and needs app restart');
+    }
 
     // 为每个显示器匹配对应的截图源
     // 记录已使用的 source，避免重复匹配
@@ -954,13 +993,17 @@ export default class Screenshots extends Events {
 
       if (source) {
         usedSources.add(source.id);
-        result.set(display.id, source.thumbnail.toDataURL());
+        const dataUrl = source.thumbnail.toDataURL();
+        result.set(display.id, dataUrl);
+        this.logger(`[Capture] ✅ Display ${display.id} matched to source ${source.id}, dataUrl length: ${dataUrl.length}`);
       } else {
-        this.logger(`No source found for display ${display.id}`);
+        this.logger(`[Capture] ❌ No source found for display ${display.id}`);
       }
     });
 
-    this.logger(`All captures completed in ${Date.now() - captureStart}ms`);
+    this.logger(`[Capture] Total captures: ${result.size}/${displays.length}`);
+    this.logger(`[Capture] All captures completed in ${Date.now() - captureStart}ms`);
+    this.logger('[Capture] =============================================');
     return result;
   }
 
