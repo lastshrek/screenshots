@@ -1108,11 +1108,12 @@ export default class Screenshots extends Events {
       if (source) {
         usedSources.add(source.id);
         // 使用临时文件代替 dataURL，避免大图片 base64 转换耗时
+        // 使用 JPEG 格式，比 PNG 快很多
         const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
         fs.ensureDirSync(tempDir);
-        const tempFile = path.join(tempDir, `capture-${display.id}-${Date.now()}.png`);
+        const tempFile = path.join(tempDir, `capture-${display.id}-${Date.now()}.jpg`);
         const convertStart = Date.now();
-        fs.writeFileSync(tempFile, source.thumbnail.toPNG());
+        fs.writeFileSync(tempFile, source.thumbnail.toJPEG(90));
         this.tempFiles.add(tempFile);
         const fileUrl = `file://${tempFile}`;
         result.set(display.id, fileUrl);

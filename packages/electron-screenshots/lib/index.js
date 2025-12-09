@@ -1170,11 +1170,12 @@ var Screenshots = /** @class */ (function (_super) {
                             if (source) {
                                 usedSources.add(source.id);
                                 // 使用临时文件代替 dataURL，避免大图片 base64 转换耗时
+                                // 使用 JPEG 格式，比 PNG 快很多
                                 var tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
                                 fs_extra_1.default.ensureDirSync(tempDir);
-                                var tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".png"));
+                                var tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".jpg"));
                                 var convertStart = Date.now();
-                                fs_extra_1.default.writeFileSync(tempFile, source.thumbnail.toPNG());
+                                fs_extra_1.default.writeFileSync(tempFile, source.thumbnail.toJPEG(90));
                                 _this.tempFiles.add(tempFile);
                                 var fileUrl = "file://".concat(tempFile);
                                 result.set(display.id, fileUrl);
