@@ -982,20 +982,8 @@ export default class Screenshots extends Events {
       this.logger(`[Capture] Display ${i}: id=${d.id}, ${d.width}x${d.height}, scale=${d.scaleFactor}`);
     });
 
-    // macOS: 优先使用原生命令截图（更快）
-    if (process.platform === 'darwin') {
-      try {
-        const nativeResult = await this.captureWithNativeCommand(displays);
-        if (nativeResult.size === displays.length) {
-          this.logger(`[Capture] All captures completed in ${Date.now() - captureStart}ms (native)`);
-          this.logger('[Capture] =============================================');
-          return nativeResult;
-        }
-        this.logger('[Capture] Native capture incomplete, falling back to desktopCapturer...');
-      } catch (err) {
-        this.logger('[Capture] Native capture failed, falling back to desktopCapturer:', err);
-      }
-    }
+    // macOS: 暂时禁用原生截图，使用 desktopCapturer
+    // 经测试，desktopCapturer 对高分辨率屏幕可能更快
 
     // 找出最大的屏幕尺寸，用于 thumbnailSize
     const maxWidth = Math.max(...displays.map((d) => d.width * d.scaleFactor));

@@ -1042,7 +1042,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, nativeResult, err_4, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
+            var captureStart, result, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -1054,25 +1054,6 @@ var Screenshots = /** @class */ (function (_super) {
                         displays.forEach(function (d, i) {
                             _this.logger("[Capture] Display ".concat(i, ": id=").concat(d.id, ", ").concat(d.width, "x").concat(d.height, ", scale=").concat(d.scaleFactor));
                         });
-                        if (!(process.platform === 'darwin')) return [3 /*break*/, 4];
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, this.captureWithNativeCommand(displays)];
-                    case 2:
-                        nativeResult = _a.sent();
-                        if (nativeResult.size === displays.length) {
-                            this.logger("[Capture] All captures completed in ".concat(Date.now() - captureStart, "ms (native)"));
-                            this.logger('[Capture] =============================================');
-                            return [2 /*return*/, nativeResult];
-                        }
-                        this.logger('[Capture] Native capture incomplete, falling back to desktopCapturer...');
-                        return [3 /*break*/, 4];
-                    case 3:
-                        err_4 = _a.sent();
-                        this.logger('[Capture] Native capture failed, falling back to desktopCapturer:', err_4);
-                        return [3 /*break*/, 4];
-                    case 4:
                         maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
                         maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
                         this.logger("[Capture] Max thumbnail size: ".concat(maxWidth, "x").concat(maxHeight));
@@ -1082,7 +1063,7 @@ var Screenshots = /** @class */ (function (_super) {
                         maxRetries = 3;
                         retryDelay = 500;
                         attemptCapture = function (attempt) { return __awaiter(_this, void 0, void 0, function () {
-                            var attemptStart, hasValidData, err_5;
+                            var attemptStart, hasValidData, err_4;
                             return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0:
@@ -1105,10 +1086,10 @@ var Screenshots = /** @class */ (function (_super) {
                                         this.logger('[Capture] (This is normal for first-time permission request on macOS)');
                                         return [2 /*return*/, false];
                                     case 2:
-                                        err_5 = _a.sent();
-                                        this.logger("[Capture] \u274C Attempt ".concat(attempt, ": desktopCapturer.getSources FAILED:"), err_5);
+                                        err_4 = _a.sent();
+                                        this.logger("[Capture] \u274C Attempt ".concat(attempt, ": desktopCapturer.getSources FAILED:"), err_4);
                                         if (attempt === maxRetries) {
-                                            throw err_5;
+                                            throw err_4;
                                         }
                                         return [2 /*return*/, false];
                                     case 3: return [2 /*return*/];
@@ -1117,26 +1098,26 @@ var Screenshots = /** @class */ (function (_super) {
                         }); };
                         delay = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
                         return [4 /*yield*/, attemptCapture(1)];
-                    case 5:
+                    case 1:
                         success = _a.sent();
-                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 8];
+                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 4];
                         return [4 /*yield*/, delay(retryDelay)];
-                    case 6:
+                    case 2:
                         _a.sent();
                         return [4 /*yield*/, attemptCapture(2)];
-                    case 7:
+                    case 3:
                         success = _a.sent();
-                        _a.label = 8;
-                    case 8:
-                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 11];
+                        _a.label = 4;
+                    case 4:
+                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 7];
                         return [4 /*yield*/, delay(retryDelay)];
-                    case 9:
+                    case 5:
                         _a.sent();
                         return [4 /*yield*/, attemptCapture(3)];
-                    case 10:
+                    case 6:
                         _a.sent();
-                        _a.label = 11;
-                    case 11:
+                        _a.label = 7;
+                    case 7:
                         // 打印每个 source 的详细信息
                         sources.forEach(function (s, i) {
                             var size = s.thumbnail.getSize();
