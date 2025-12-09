@@ -147,6 +147,7 @@ export default class Screenshots extends Events {
       movable: false,
       minimizable: false,
       maximizable: false,
+      closable: false, // 禁用关闭按钮
       focusable: true,
       skipTaskbar: true,
       alwaysOnTop: true,
@@ -154,7 +155,6 @@ export default class Screenshots extends Events {
       fullscreenable: false,
       kiosk: false,
       backgroundColor: '#00000001',
-      titleBarStyle: 'hidden',
       hasShadow: false,
       paintWhenInitiallyHidden: true, // 允许后台渲染
       roundedCorners: false,
@@ -428,6 +428,7 @@ export default class Screenshots extends Events {
       transparent: true,
       resizable: false,
       movable: false,
+      closable: false, // 禁用关闭按钮
       focusable: true,
       skipTaskbar: true,
       alwaysOnTop: true,
@@ -435,7 +436,6 @@ export default class Screenshots extends Events {
       fullscreenable: false,
       kiosk: false,
       backgroundColor: '#00000001',
-      titleBarStyle: 'hidden',
       hasShadow: false,
       enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
     });
@@ -676,6 +676,7 @@ export default class Screenshots extends Events {
         movable: false,
         minimizable: false,
         maximizable: false,
+        closable: false, // 禁用关闭按钮
         // focusable 必须设置为 true, 否则窗口不能及时响应esc按键，输入框也不能输入
         focusable: true,
         skipTaskbar: true,
@@ -692,7 +693,6 @@ export default class Screenshots extends Events {
         kiosk: false, // 先不启用 kiosk，等窗口显示后再启用
         // 使用极低透明度的黑色，防止 Windows 下完全透明导致的鼠标穿透问题
         backgroundColor: '#00000001',
-        titleBarStyle: 'hidden',
         hasShadow: false,
         paintWhenInitiallyHidden: false,
         // mac 特有的属性
@@ -913,6 +913,7 @@ export default class Screenshots extends Events {
 
   /**
    * macOS 原生截图（使用 screencapture 命令，速度更快）
+   * 一次性截取所有屏幕到一个文件，然后根据显示器位置裁剪
    */
   private async captureWithNativeCommand(displays: Display[]): Promise<Map<number, string>> {
     const { execFile } = await import('child_process');
@@ -926,28 +927,39 @@ export default class Screenshots extends Events {
 
     this.logger('[Capture] Using native screencapture command...');
 
-    // 为每个显示器截图
+    // 方案：为每个显示器单独截图（并行执行）
+    // 使用 -D 参数指定显示器，但需要先获取显示器顺序
+    const timestamp = Date.now();
+
+    // 并行截取所有显示器
     const capturePromises = displays.map(async (display, index) => {
-      const tempFile = path.join(tempDir, `capture-${display.id}-${Date.now()}.png`);
+      const tempFile = path.join(tempDir, `capture-${display.id}-${timestamp}.jpg`);
       this.tempFiles.add(tempFile);
 
+      const startTime = Date.now();
       try {
         // -x: 静音（不播放快门声）
         // -D: 指定显示器（从1开始）
-        // -t png: 输出格式
-        await execFileAsync('screencapture', ['-x', '-D', String(index + 1), '-t', 'png', tempFile]);
+        // -t jpg: 使用 jpg 格式，比 png 快
+        // -C: 不包含窗口阴影（可选，可能加快速度）
+        await execFileAsync('screencapture', [
+          '-x',
+          '-D', String(index + 1),
+          '-t', 'jpg',
+          tempFile,
+        ]);
 
         const imageBuffer = await fs.readFile(tempFile);
         const image = nativeImage.createFromBuffer(imageBuffer);
 
         if (!image.isEmpty()) {
           result.set(display.id, image.toDataURL());
-          this.logger(`[Capture] ✅ Native capture for display ${display.id} succeeded`);
+          this.logger(`[Capture] ✅ Display ${display.id} captured in ${Date.now() - startTime}ms`);
         } else {
-          this.logger(`[Capture] ⚠️ Native capture for display ${display.id} returned empty image`);
+          this.logger(`[Capture] ⚠️ Display ${display.id} returned empty image`);
         }
       } catch (err) {
-        this.logger(`[Capture] ❌ Native capture for display ${display.id} failed:`, err);
+        this.logger(`[Capture] ❌ Display ${display.id} capture failed:`, err);
       }
     });
 

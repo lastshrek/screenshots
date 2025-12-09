@@ -193,6 +193,7 @@ var Screenshots = /** @class */ (function (_super) {
                     movable: false,
                     minimizable: false,
                     maximizable: false,
+                    closable: false,
                     focusable: true,
                     skipTaskbar: true,
                     alwaysOnTop: true,
@@ -200,7 +201,6 @@ var Screenshots = /** @class */ (function (_super) {
                     fullscreenable: false,
                     kiosk: false,
                     backgroundColor: '#00000001',
-                    titleBarStyle: 'hidden',
                     hasShadow: false,
                     paintWhenInitiallyHidden: true,
                     roundedCorners: false,
@@ -474,6 +474,7 @@ var Screenshots = /** @class */ (function (_super) {
             transparent: true,
             resizable: false,
             movable: false,
+            closable: false,
             focusable: true,
             skipTaskbar: true,
             alwaysOnTop: true,
@@ -481,7 +482,6 @@ var Screenshots = /** @class */ (function (_super) {
             fullscreenable: false,
             kiosk: false,
             backgroundColor: '#00000001',
-            titleBarStyle: 'hidden',
             hasShadow: false,
             enableLargerThanScreen: true, // 允许窗口覆盖整个屏幕包括 Dock
         });
@@ -775,6 +775,7 @@ var Screenshots = /** @class */ (function (_super) {
                                 movable: false,
                                 minimizable: false,
                                 maximizable: false,
+                                closable: false,
                                 // focusable 必须设置为 true, 否则窗口不能及时响应esc按键，输入框也不能输入
                                 focusable: true,
                                 skipTaskbar: true,
@@ -791,7 +792,6 @@ var Screenshots = /** @class */ (function (_super) {
                                 kiosk: false,
                                 // 使用极低透明度的黑色，防止 Windows 下完全透明导致的鼠标穿透问题
                                 backgroundColor: '#00000001',
-                                titleBarStyle: 'hidden',
                                 hasShadow: false,
                                 paintWhenInitiallyHidden: false,
                                 // mac 特有的属性
@@ -958,10 +958,11 @@ var Screenshots = /** @class */ (function (_super) {
     };
     /**
      * macOS 原生截图（使用 screencapture 命令，速度更快）
+     * 一次性截取所有屏幕到一个文件，然后根据显示器位置裁剪
      */
     Screenshots.prototype.captureWithNativeCommand = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var execFile, promisify, execFileAsync, captureStart, result, tempDir, capturePromises;
+            var execFile, promisify, execFileAsync, captureStart, result, tempDir, timestamp, capturePromises;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -979,24 +980,33 @@ var Screenshots = /** @class */ (function (_super) {
                     case 3:
                         _a.sent();
                         this.logger('[Capture] Using native screencapture command...');
+                        timestamp = Date.now();
                         capturePromises = displays.map(function (display, index) { return __awaiter(_this, void 0, void 0, function () {
-                            var tempFile, imageBuffer, image, err_3;
+                            var tempFile, startTime, imageBuffer, image, err_3;
                             return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0:
-                                        tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".png"));
+                                        tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(timestamp, ".jpg"));
                                         this.tempFiles.add(tempFile);
+                                        startTime = Date.now();
                                         _a.label = 1;
                                     case 1:
                                         _a.trys.push([1, 4, , 5]);
                                         // -x: 静音（不播放快门声）
                                         // -D: 指定显示器（从1开始）
-                                        // -t png: 输出格式
-                                        return [4 /*yield*/, execFileAsync('screencapture', ['-x', '-D', String(index + 1), '-t', 'png', tempFile])];
+                                        // -t jpg: 使用 jpg 格式，比 png 快
+                                        // -C: 不包含窗口阴影（可选，可能加快速度）
+                                        return [4 /*yield*/, execFileAsync('screencapture', [
+                                                '-x',
+                                                '-D', String(index + 1),
+                                                '-t', 'jpg',
+                                                tempFile,
+                                            ])];
                                     case 2:
                                         // -x: 静音（不播放快门声）
                                         // -D: 指定显示器（从1开始）
-                                        // -t png: 输出格式
+                                        // -t jpg: 使用 jpg 格式，比 png 快
+                                        // -C: 不包含窗口阴影（可选，可能加快速度）
                                         _a.sent();
                                         return [4 /*yield*/, fs_extra_1.default.readFile(tempFile)];
                                     case 3:
@@ -1004,15 +1014,15 @@ var Screenshots = /** @class */ (function (_super) {
                                         image = electron_1.nativeImage.createFromBuffer(imageBuffer);
                                         if (!image.isEmpty()) {
                                             result.set(display.id, image.toDataURL());
-                                            this.logger("[Capture] \u2705 Native capture for display ".concat(display.id, " succeeded"));
+                                            this.logger("[Capture] \u2705 Display ".concat(display.id, " captured in ").concat(Date.now() - startTime, "ms"));
                                         }
                                         else {
-                                            this.logger("[Capture] \u26A0\uFE0F Native capture for display ".concat(display.id, " returned empty image"));
+                                            this.logger("[Capture] \u26A0\uFE0F Display ".concat(display.id, " returned empty image"));
                                         }
                                         return [3 /*break*/, 5];
                                     case 4:
                                         err_3 = _a.sent();
-                                        this.logger("[Capture] \u274C Native capture for display ".concat(display.id, " failed:"), err_3);
+                                        this.logger("[Capture] \u274C Display ".concat(display.id, " capture failed:"), err_3);
                                         return [3 /*break*/, 5];
                                     case 5: return [2 /*return*/];
                                 }

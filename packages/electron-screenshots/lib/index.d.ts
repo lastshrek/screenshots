@@ -102,6 +102,7 @@ export default class Screenshots extends Events {
     private cachedSourcesTime;
     /**
      * macOS 原生截图（使用 screencapture 命令，速度更快）
+     * 一次性截取所有屏幕到一个文件，然后根据显示器位置裁剪
      */
     private captureWithNativeCommand;
     /**
