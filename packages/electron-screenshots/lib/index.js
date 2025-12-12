@@ -209,7 +209,13 @@ var Screenshots = /** @class */ (function (_super) {
                 });
                 // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
                 if (process.platform === 'darwin') {
-                    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                    try {
+                        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                    }
+                    catch (_b) {
+                        // 旧版本 Electron 可能不支持第二个参数
+                        win.setVisibleOnAllWorkspaces(true);
+                    }
                 }
                 view = new electron_1.BrowserView({
                     webPreferences: {
@@ -487,7 +493,13 @@ var Screenshots = /** @class */ (function (_super) {
         });
         // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
         if (process.platform === 'darwin') {
-            win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+            try {
+                win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+            }
+            catch (_a) {
+                // 旧版本 Electron 可能不支持第二个参数
+                win.setVisibleOnAllWorkspaces(true);
+            }
         }
         var view = new electron_1.BrowserView({
             webPreferences: {
@@ -801,7 +813,13 @@ var Screenshots = /** @class */ (function (_super) {
                             });
                             // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
                             if (process.platform === 'darwin') {
-                                win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                                try {
+                                    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                                }
+                                catch (_b) {
+                                    // 旧版本 Electron 可能不支持第二个参数
+                                    win.setVisibleOnAllWorkspaces(true);
+                                }
                             }
                             this.$wins.set(display.id, win);
                             this.emit('windowCreated', win);
@@ -928,10 +946,16 @@ var Screenshots = /** @class */ (function (_super) {
                             win.setWindowButtonVisibility(false);
                         }
                         if (process.platform !== 'win32') {
-                            win.setVisibleOnAllWorkspaces(true, {
-                                visibleOnFullScreen: true,
-                                skipTransformProcessType: true,
-                            });
+                            try {
+                                win.setVisibleOnAllWorkspaces(true, {
+                                    visibleOnFullScreen: true,
+                                    skipTransformProcessType: true,
+                                });
+                            }
+                            catch (_c) {
+                                // 旧版本 Electron 可能不支持第二个参数
+                                win.setVisibleOnAllWorkspaces(true);
+                            }
                         }
                         // 不要blur，否则窗口无法接收键盘和鼠标事件
                         // win.blur();

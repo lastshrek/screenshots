@@ -164,7 +164,12 @@ export default class Screenshots extends Events {
 
     // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
     if (process.platform === 'darwin') {
-      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      try {
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      } catch {
+        // 旧版本 Electron 可能不支持第二个参数
+        win.setVisibleOnAllWorkspaces(true);
+      }
     }
 
     const view = new BrowserView({
@@ -442,7 +447,12 @@ export default class Screenshots extends Events {
 
     // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
     if (process.platform === 'darwin') {
-      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      try {
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      } catch {
+        // 旧版本 Electron 可能不支持第二个参数
+        win.setVisibleOnAllWorkspaces(true);
+      }
     }
 
     const view = new BrowserView({
@@ -703,7 +713,12 @@ export default class Screenshots extends Events {
 
       // macOS: 确保窗口在所有工作区可见，并覆盖 Dock
       if (process.platform === 'darwin') {
-        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        try {
+          win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        } catch {
+          // 旧版本 Electron 可能不支持第二个参数
+          win.setVisibleOnAllWorkspaces(true);
+        }
       }
 
       this.$wins.set(display.id, win);
@@ -877,10 +892,15 @@ export default class Screenshots extends Events {
     }
 
     if (process.platform !== 'win32') {
-      win.setVisibleOnAllWorkspaces(true, {
-        visibleOnFullScreen: true,
-        skipTransformProcessType: true,
-      });
+      try {
+        win.setVisibleOnAllWorkspaces(true, {
+          visibleOnFullScreen: true,
+          skipTransformProcessType: true,
+        });
+      } catch {
+        // 旧版本 Electron 可能不支持第二个参数
+        win.setVisibleOnAllWorkspaces(true);
+      }
     }
 
     // 不要blur，否则窗口无法接收键盘和鼠标事件
