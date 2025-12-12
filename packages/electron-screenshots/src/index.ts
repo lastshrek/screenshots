@@ -320,7 +320,7 @@ export default class Screenshots extends Events {
     }
 
     // 注册全局 ESC 快捷键，确保能退出
-    globalShortcut.register('Esc', () => {
+    const escHandler = () => {
       this.logger('Global ESC pressed, canceling capture');
       const event = new Event();
       this.emit('cancel', event);
@@ -328,7 +328,18 @@ export default class Screenshots extends Events {
         return;
       }
       this.endCapture();
-    });
+    };
+
+    try {
+      // 尝试注册 Escape 快捷键
+      const registered = globalShortcut.register('Escape', escHandler);
+      if (!registered) {
+        this.logger('[Shortcut] Failed to register Escape shortcut');
+      }
+    } catch (err) {
+      this.logger('[Shortcut] Error registering Escape shortcut:', err);
+      // 忽略错误，截图功能仍然可以通过其他方式退出
+    }
 
     const displays = getAllDisplays();
 
@@ -548,7 +559,11 @@ export default class Screenshots extends Events {
     this.logger('endCapture');
 
     // 注销全局 ESC 快捷键
-    globalShortcut.unregister('Esc');
+    try {
+      globalShortcut.unregister('Escape');
+    } catch {
+      // 忽略错误
+    }
 
     await this.reset();
 

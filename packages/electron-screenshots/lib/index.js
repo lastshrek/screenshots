@@ -364,7 +364,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.startCapture = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var startTime, displays, captureMap, validCaptures, cursorPoint, focusDisplay, focusWin;
+            var startTime, escHandler, registered, displays, captureMap, validCaptures, cursorPoint, focusDisplay, focusWin;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -375,8 +375,7 @@ var Screenshots = /** @class */ (function (_super) {
                         if (process.platform === 'darwin') {
                             this.checkScreenRecordingPermission();
                         }
-                        // 注册全局 ESC 快捷键，确保能退出
-                        electron_1.globalShortcut.register('Esc', function () {
+                        escHandler = function () {
                             _this.logger('Global ESC pressed, canceling capture');
                             var event = new event_1.default();
                             _this.emit('cancel', event);
@@ -384,7 +383,17 @@ var Screenshots = /** @class */ (function (_super) {
                                 return;
                             }
                             _this.endCapture();
-                        });
+                        };
+                        try {
+                            registered = electron_1.globalShortcut.register('Escape', escHandler);
+                            if (!registered) {
+                                this.logger('[Shortcut] Failed to register Escape shortcut');
+                            }
+                        }
+                        catch (err) {
+                            this.logger('[Shortcut] Error registering Escape shortcut:', err);
+                            // 忽略错误，截图功能仍然可以通过其他方式退出
+                        }
                         displays = (0, getDisplay_1.getAllDisplays)();
                         return [4 /*yield*/, Promise.all([
                                 // 一次性截取所有屏幕（避免多次调用 desktopCapturer）
@@ -603,7 +612,12 @@ var Screenshots = /** @class */ (function (_super) {
                     case 0:
                         this.logger('endCapture');
                         // 注销全局 ESC 快捷键
-                        electron_1.globalShortcut.unregister('Esc');
+                        try {
+                            electron_1.globalShortcut.unregister('Escape');
+                        }
+                        catch (_b) {
+                            // 忽略错误
+                        }
                         return [4 /*yield*/, this.reset()];
                     case 1:
                         _a.sent();
