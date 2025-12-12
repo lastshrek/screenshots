@@ -1080,7 +1080,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
+            var captureStart, result, safeScale, rawMaxWidth, rawMaxHeight, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -1089,12 +1089,16 @@ var Screenshots = /** @class */ (function (_super) {
                         result = new Map();
                         this.logger('[Capture] ========== Starting Screen Capture ==========');
                         this.logger('[Capture] Number of displays:', displays.length);
-                        displays.forEach(function (d, i) {
-                            _this.logger("[Capture] Display ".concat(i, ": id=").concat(d.id, ", ").concat(d.width, "x").concat(d.height, ", scale=").concat(d.scaleFactor));
-                        });
-                        maxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * d.scaleFactor; }));
-                        maxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * d.scaleFactor; }));
+                        this.logger('[Capture] displays:', JSON.stringify(displays.map(function (d) { return ({
+                            id: d.id, width: d.width, height: d.height, scaleFactor: d.scaleFactor,
+                        }); })));
+                        safeScale = function (sf) { return (Number.isFinite(sf) && sf > 0 ? sf : 1); };
+                        rawMaxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * safeScale(d.scaleFactor); }));
+                        rawMaxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * safeScale(d.scaleFactor); }));
+                        maxWidth = Math.min(Math.max(1, Math.round(rawMaxWidth) || 1920), 8192);
+                        maxHeight = Math.min(Math.max(1, Math.round(rawMaxHeight) || 1080), 8192);
                         this.logger("[Capture] Max thumbnail size: ".concat(maxWidth, "x").concat(maxHeight));
+                        this.logger("[Capture] (raw: ".concat(rawMaxWidth, "x").concat(rawMaxHeight, ")"));
                         // 一次性获取所有屏幕截图（带重试机制）
                         this.logger('[Capture] Calling desktopCapturer.getSources...');
                         sources = [];

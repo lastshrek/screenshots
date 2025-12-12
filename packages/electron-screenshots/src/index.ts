@@ -1013,17 +1013,24 @@ export default class Screenshots extends Events {
 
     this.logger('[Capture] ========== Starting Screen Capture ==========');
     this.logger('[Capture] Number of displays:', displays.length);
-    displays.forEach((d, i) => {
-      this.logger(`[Capture] Display ${i}: id=${d.id}, ${d.width}x${d.height}, scale=${d.scaleFactor}`);
-    });
+    this.logger('[Capture] displays:', JSON.stringify(displays.map((d) => ({
+      id: d.id, width: d.width, height: d.height, scaleFactor: d.scaleFactor,
+    }))));
 
     // macOS: 暂时禁用原生截图，使用 desktopCapturer
     // 经测试，desktopCapturer 对高分辨率屏幕可能更快
 
     // 找出最大的屏幕尺寸，用于 thumbnailSize
-    const maxWidth = Math.max(...displays.map((d) => d.width * d.scaleFactor));
-    const maxHeight = Math.max(...displays.map((d) => d.height * d.scaleFactor));
+    // 确保 scaleFactor 是有效的数字，默认为 1
+    const safeScale = (sf: number) => (Number.isFinite(sf) && sf > 0 ? sf : 1);
+    const rawMaxWidth = Math.max(...displays.map((d) => d.width * safeScale(d.scaleFactor)));
+    const rawMaxHeight = Math.max(...displays.map((d) => d.height * safeScale(d.scaleFactor)));
+
+    // 确保 thumbnailSize 是有效的整数，范围在 1-8192 之间
+    const maxWidth = Math.min(Math.max(1, Math.round(rawMaxWidth) || 1920), 8192);
+    const maxHeight = Math.min(Math.max(1, Math.round(rawMaxHeight) || 1080), 8192);
     this.logger(`[Capture] Max thumbnail size: ${maxWidth}x${maxHeight}`);
+    this.logger(`[Capture] (raw: ${rawMaxWidth}x${rawMaxHeight})`);
 
     // 一次性获取所有屏幕截图（带重试机制）
     this.logger('[Capture] Calling desktopCapturer.getSources...');
