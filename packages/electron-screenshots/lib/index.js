@@ -1080,7 +1080,7 @@ var Screenshots = /** @class */ (function (_super) {
      */
     Screenshots.prototype.captureAllDisplays = function (displays) {
         return __awaiter(this, void 0, void 0, function () {
-            var captureStart, result, safeScale, rawMaxWidth, rawMaxHeight, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources;
+            var captureStart, result, safeScale, rawMaxWidth, rawMaxHeight, maxWidth, maxHeight, sources, maxRetries, retryDelay, attemptCapture, delay, success, usedSources, processDisplay;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -1170,67 +1170,143 @@ var Screenshots = /** @class */ (function (_super) {
                             this.logger('[Capture]   1. Screen recording permission is not granted');
                             this.logger('[Capture]   2. User needs to grant permission and restart the app');
                         }
+                        // 检查显示器数量和 source 数量是否匹配
+                        if (sources.length < displays.length) {
+                            this.logger("[Capture] \u26A0\uFE0F Warning: Found ".concat(sources.length, " sources but ").concat(displays.length, " displays"));
+                            this.logger('[Capture] Some displays may not be captured. Possible causes:');
+                            this.logger('[Capture]   1. HDR enabled on some displays (Windows 10-bit color)');
+                            this.logger('[Capture]   2. Display driver issues');
+                            this.logger('[Capture] Solution: Try disabling HDR in Windows Display Settings');
+                        }
                         usedSources = new Set();
-                        displays.forEach(function (display) {
-                            var source;
-                            if (sources.length === 1) {
-                                source = sources[0];
-                            }
-                            else {
-                                // 优先使用 display_id 匹配（Win10/11、macOS）
-                                source = sources.find(function (item) { return !usedSources.has(item.id)
-                                    && item.display_id
-                                    && item.display_id === display.id.toString(); });
-                                // 如果 display_id 为空（Win7/Linux），使用 source.id 中的索引匹配
-                                if (!source) {
-                                    source = sources.find(function (item) { return !usedSources.has(item.id)
-                                        && item.id.startsWith("screen:".concat(display.id, ":")); });
+                        processDisplay = function (display) { return __awaiter(_this, void 0, void 0, function () {
+                            var source, displayWidth_1, displayHeight_1, size, tempDir, tempFile, convertStart, fileUrl, nativeUrl;
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        if (sources.length === 1) {
+                                            source = sources[0];
+                                        }
+                                        else {
+                                            // 优先使用 display_id 匹配（Win10/11、macOS）
+                                            source = sources.find(function (item) { return !usedSources.has(item.id)
+                                                && item.display_id
+                                                && item.display_id === display.id.toString(); });
+                                            // 如果 display_id 为空（Win7/Linux），使用 source.id 中的索引匹配
+                                            if (!source) {
+                                                source = sources.find(function (item) { return !usedSources.has(item.id)
+                                                    && item.id.startsWith("screen:".concat(display.id, ":")); });
+                                            }
+                                            // Win7 回退：尝试通过截图尺寸匹配
+                                            if (!source) {
+                                                displayWidth_1 = Math.round(display.width * display.scaleFactor);
+                                                displayHeight_1 = Math.round(display.height * display.scaleFactor);
+                                                // 尝试找尺寸匹配的 source
+                                                source = sources.find(function (item) {
+                                                    if (usedSources.has(item.id))
+                                                        return false;
+                                                    var size = item.thumbnail.getSize();
+                                                    // 允许一定误差（缩放可能导致几像素差异）
+                                                    return Math.abs(size.width - displayWidth_1) < 10
+                                                        && Math.abs(size.height - displayHeight_1) < 10;
+                                                });
+                                                // 如果尺寸匹配失败，使用剩余的第一个 source
+                                                if (!source) {
+                                                    source = sources.find(function (item) { return !usedSources.has(item.id); });
+                                                }
+                                                if (source) {
+                                                    size = source.thumbnail.getSize();
+                                                    this.logger("Fallback matching: display ".concat(display.id, " (").concat(displayWidth_1, "x").concat(displayHeight_1, ") -> source ").concat(source.id, " (").concat(size.width, "x").concat(size.height, ")"));
+                                                }
+                                            }
+                                        }
+                                        if (!source) return [3 /*break*/, 1];
+                                        usedSources.add(source.id);
+                                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                                        fs_extra_1.default.ensureDirSync(tempDir);
+                                        tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".jpg"));
+                                        convertStart = Date.now();
+                                        fs_extra_1.default.writeFileSync(tempFile, source.thumbnail.toJPEG(90));
+                                        this.tempFiles.add(tempFile);
+                                        fileUrl = "file://".concat(tempFile);
+                                        result.set(display.id, fileUrl);
+                                        this.logger("[Capture] \u2705 Display ".concat(display.id, " -> ").concat(source.id, ", saved in ").concat(Date.now() - convertStart, "ms"));
+                                        return [3 /*break*/, 3];
+                                    case 1:
+                                        this.logger("[Capture] \u274C No source found for display ".concat(display.id));
+                                        if (!(process.platform === 'win32')) return [3 /*break*/, 3];
+                                        this.logger("[Capture] Trying Windows native capture for display ".concat(display.id, "..."));
+                                        return [4 /*yield*/, this.captureDisplayWithNative(display)];
+                                    case 2:
+                                        nativeUrl = _a.sent();
+                                        if (nativeUrl) {
+                                            result.set(display.id, nativeUrl);
+                                            this.logger("[Capture] \u2705 Display ".concat(display.id, " captured with native method"));
+                                        }
+                                        _a.label = 3;
+                                    case 3: return [2 /*return*/];
                                 }
-                                // Win7 回退：尝试通过截图尺寸匹配
-                                if (!source) {
-                                    var displayWidth_1 = Math.round(display.width * display.scaleFactor);
-                                    var displayHeight_1 = Math.round(display.height * display.scaleFactor);
-                                    // 尝试找尺寸匹配的 source
-                                    source = sources.find(function (item) {
-                                        if (usedSources.has(item.id))
-                                            return false;
-                                        var size = item.thumbnail.getSize();
-                                        // 允许一定误差（缩放可能导致几像素差异）
-                                        return Math.abs(size.width - displayWidth_1) < 10
-                                            && Math.abs(size.height - displayHeight_1) < 10;
-                                    });
-                                    // 如果尺寸匹配失败，使用剩余的第一个 source
-                                    if (!source) {
-                                        source = sources.find(function (item) { return !usedSources.has(item.id); });
-                                    }
-                                    if (source) {
-                                        var size = source.thumbnail.getSize();
-                                        _this.logger("Fallback matching: display ".concat(display.id, " (").concat(displayWidth_1, "x").concat(displayHeight_1, ") -> source ").concat(source.id, " (").concat(size.width, "x").concat(size.height, ")"));
-                                    }
-                                }
-                            }
-                            if (source) {
-                                usedSources.add(source.id);
-                                // 使用临时文件代替 dataURL，避免大图片 base64 转换耗时
-                                // 使用 JPEG 格式，比 PNG 快很多
-                                var tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
-                                fs_extra_1.default.ensureDirSync(tempDir);
-                                var tempFile = path_1.default.join(tempDir, "capture-".concat(display.id, "-").concat(Date.now(), ".jpg"));
-                                var convertStart = Date.now();
-                                fs_extra_1.default.writeFileSync(tempFile, source.thumbnail.toJPEG(90));
-                                _this.tempFiles.add(tempFile);
-                                var fileUrl = "file://".concat(tempFile);
-                                result.set(display.id, fileUrl);
-                                _this.logger("[Capture] \u2705 Display ".concat(display.id, " -> ").concat(source.id, ", saved in ").concat(Date.now() - convertStart, "ms"));
-                            }
-                            else {
-                                _this.logger("[Capture] \u274C No source found for display ".concat(display.id));
-                            }
-                        });
+                            });
+                        }); };
+                        // 串行处理每个显示器（需要等待 native fallback）
+                        return [4 /*yield*/, displays.reduce(function (promise, display) { return promise.then(function () { return processDisplay(display); }); }, Promise.resolve())];
+                    case 8:
+                        // 串行处理每个显示器（需要等待 native fallback）
+                        _a.sent();
                         this.logger("[Capture] Total captures: ".concat(result.size, "/").concat(displays.length));
                         this.logger("[Capture] All captures completed in ".concat(Date.now() - captureStart, "ms"));
                         this.logger('[Capture] =============================================');
                         return [2 /*return*/, result];
+                }
+            });
+        });
+    };
+    /**
+     * Windows 原生截图（使用 PowerShell，支持 10-bit HDR 显示器）
+     * 当 desktopCapturer 无法捕获某个显示器时使用
+     */
+    Screenshots.prototype.captureDisplayWithNative = function (display) {
+        return __awaiter(this, void 0, void 0, function () {
+            var execFile, promisify, execFileAsync, tempDir, tempFile, psScript, err_5;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (process.platform !== 'win32') {
+                            return [2 /*return*/, null];
+                        }
+                        _a.label = 1;
+                    case 1:
+                        _a.trys.push([1, 5, , 6]);
+                        return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('child_process')); })];
+                    case 2:
+                        execFile = (_a.sent()).execFile;
+                        return [4 /*yield*/, Promise.resolve().then(function () { return __importStar(require('util')); })];
+                    case 3:
+                        promisify = (_a.sent()).promisify;
+                        execFileAsync = promisify(execFile);
+                        tempDir = path_1.default.join(os_1.default.tmpdir(), 'electron-screenshots');
+                        fs_extra_1.default.ensureDirSync(tempDir);
+                        tempFile = path_1.default.join(tempDir, "native-".concat(display.id, "-").concat(Date.now(), ".png"));
+                        psScript = "\nAdd-Type -AssemblyName System.Windows.Forms\nAdd-Type -AssemblyName System.Drawing\n$bounds = [System.Drawing.Rectangle]::FromLTRB(".concat(display.x, ", ").concat(display.y, ", ").concat(display.x + display.width, ", ").concat(display.y + display.height, ")\n$bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)\n$graphics = [System.Drawing.Graphics]::FromImage($bitmap)\n$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)\n$bitmap.Save('").concat(tempFile.replace(/\\/g, '\\\\'), "', [System.Drawing.Imaging.ImageFormat]::Png)\n$graphics.Dispose()\n$bitmap.Dispose()\n");
+                        return [4 /*yield*/, execFileAsync('powershell', [
+                                '-NoProfile',
+                                '-NonInteractive',
+                                '-Command',
+                                psScript,
+                            ], { timeout: 5000 })];
+                    case 4:
+                        _a.sent();
+                        if (fs_extra_1.default.existsSync(tempFile)) {
+                            this.tempFiles.add(tempFile);
+                            return [2 /*return*/, "file://".concat(tempFile)];
+                        }
+                        this.logger('[Capture] Native capture failed: file not created');
+                        return [2 /*return*/, null];
+                    case 5:
+                        err_5 = _a.sent();
+                        this.logger('[Capture] Native capture error:', err_5);
+                        return [2 /*return*/, null];
+                    case 6: return [2 /*return*/];
                 }
             });
         });

@@ -110,6 +110,11 @@ export default class Screenshots extends Events {
      */
     private captureAllDisplays;
     /**
+     * Windows 原生截图（使用 PowerShell，支持 10-bit HDR 显示器）
+     * 当 desktopCapturer 无法捕获某个显示器时使用
+     */
+    private captureDisplayWithNative;
+    /**
      * 绑定ipc时间处理
      */
     private listenIpc;

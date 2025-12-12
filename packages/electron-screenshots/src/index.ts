@@ -1095,11 +1095,21 @@ export default class Screenshots extends Events {
       this.logger('[Capture]   2. User needs to grant permission and restart the app');
     }
 
+    // 检查显示器数量和 source 数量是否匹配
+    if (sources.length < displays.length) {
+      this.logger(`[Capture] ⚠️ Warning: Found ${sources.length} sources but ${displays.length} displays`);
+      this.logger('[Capture] Some displays may not be captured. Possible causes:');
+      this.logger('[Capture]   1. HDR enabled on some displays (Windows 10-bit color)');
+      this.logger('[Capture]   2. Display driver issues');
+      this.logger('[Capture] Solution: Try disabling HDR in Windows Display Settings');
+    }
+
     // 为每个显示器匹配对应的截图源
     // 记录已使用的 source，避免重复匹配
     const usedSources = new Set<string>();
 
-    displays.forEach((display) => {
+    // 处理每个显示器的截图匹配
+    const processDisplay = async (display: Display) => {
       let source;
       if (sources.length === 1) {
         [source] = sources;
@@ -1162,13 +1172,80 @@ export default class Screenshots extends Events {
         this.logger(`[Capture] ✅ Display ${display.id} -> ${source.id}, saved in ${Date.now() - convertStart}ms`);
       } else {
         this.logger(`[Capture] ❌ No source found for display ${display.id}`);
+        // Windows: 尝试使用原生截图作为 fallback
+        if (process.platform === 'win32') {
+          this.logger(`[Capture] Trying Windows native capture for display ${display.id}...`);
+          const nativeUrl = await this.captureDisplayWithNative(display);
+          if (nativeUrl) {
+            result.set(display.id, nativeUrl);
+            this.logger(`[Capture] ✅ Display ${display.id} captured with native method`);
+          }
+        }
       }
-    });
+    };
+
+    // 串行处理每个显示器（需要等待 native fallback）
+    await displays.reduce(
+      (promise, display) => promise.then(() => processDisplay(display)),
+      Promise.resolve(),
+    );
 
     this.logger(`[Capture] Total captures: ${result.size}/${displays.length}`);
     this.logger(`[Capture] All captures completed in ${Date.now() - captureStart}ms`);
     this.logger('[Capture] =============================================');
     return result;
+  }
+
+  /**
+   * Windows 原生截图（使用 PowerShell，支持 10-bit HDR 显示器）
+   * 当 desktopCapturer 无法捕获某个显示器时使用
+   */
+  private async captureDisplayWithNative(display: Display): Promise<string | null> {
+    if (process.platform !== 'win32') {
+      return null;
+    }
+
+    try {
+      const { execFile } = await import('child_process');
+      const { promisify } = await import('util');
+      const execFileAsync = promisify(execFile);
+
+      const tempDir = path.join(os.tmpdir(), 'electron-screenshots');
+      fs.ensureDirSync(tempDir);
+      const tempFile = path.join(tempDir, `native-${display.id}-${Date.now()}.png`);
+
+      // 使用 PowerShell 截取指定显示器
+      // 注意：这个方法截取的是整个虚拟屏幕，需要根据显示器位置裁剪
+      const psScript = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$bounds = [System.Drawing.Rectangle]::FromLTRB(${display.x}, ${display.y}, ${display.x + display.width}, ${display.y + display.height})
+$bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+$bitmap.Save('${tempFile.replace(/\\/g, '\\\\')}', [System.Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose()
+$bitmap.Dispose()
+`;
+
+      await execFileAsync('powershell', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        psScript,
+      ], { timeout: 5000 });
+
+      if (fs.existsSync(tempFile)) {
+        this.tempFiles.add(tempFile);
+        return `file://${tempFile}`;
+      }
+
+      this.logger('[Capture] Native capture failed: file not created');
+      return null;
+    } catch (err) {
+      this.logger('[Capture] Native capture error:', err);
+      return null;
+    }
   }
 
   /**
