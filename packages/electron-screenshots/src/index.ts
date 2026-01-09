@@ -1017,6 +1017,10 @@ export default class Screenshots extends Events {
       id: d.id, width: d.width, height: d.height, scaleFactor: d.scaleFactor,
     }))));
 
+    // 强制刷新：添加小延迟确保获取最新的屏幕内容
+    // 某些 Windows 系统上 desktopCapturer 可能会缓存结果
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+
     // macOS: 暂时禁用原生截图，使用 desktopCapturer
     // 经测试，desktopCapturer 对高分辨率屏幕可能更快
 

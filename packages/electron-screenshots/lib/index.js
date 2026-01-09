@@ -1092,6 +1092,13 @@ var Screenshots = /** @class */ (function (_super) {
                         this.logger('[Capture] displays:', JSON.stringify(displays.map(function (d) { return ({
                             id: d.id, width: d.width, height: d.height, scaleFactor: d.scaleFactor,
                         }); })));
+                        // 强制刷新：添加小延迟确保获取最新的屏幕内容
+                        // 某些 Windows 系统上 desktopCapturer 可能会缓存结果
+                        return [4 /*yield*/, new Promise(function (resolve) { setTimeout(resolve, 50); })];
+                    case 1:
+                        // 强制刷新：添加小延迟确保获取最新的屏幕内容
+                        // 某些 Windows 系统上 desktopCapturer 可能会缓存结果
+                        _a.sent();
                         safeScale = function (sf) { return (Number.isFinite(sf) && sf > 0 ? sf : 1); };
                         rawMaxWidth = Math.max.apply(Math, displays.map(function (d) { return d.width * safeScale(d.scaleFactor); }));
                         rawMaxHeight = Math.max.apply(Math, displays.map(function (d) { return d.height * safeScale(d.scaleFactor); }));
@@ -1140,26 +1147,26 @@ var Screenshots = /** @class */ (function (_super) {
                         }); };
                         delay = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
                         return [4 /*yield*/, attemptCapture(1)];
-                    case 1:
-                        success = _a.sent();
-                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 4];
-                        return [4 /*yield*/, delay(retryDelay)];
                     case 2:
+                        success = _a.sent();
+                        if (!(!success && maxRetries >= 2)) return [3 /*break*/, 5];
+                        return [4 /*yield*/, delay(retryDelay)];
+                    case 3:
                         _a.sent();
                         return [4 /*yield*/, attemptCapture(2)];
-                    case 3:
-                        success = _a.sent();
-                        _a.label = 4;
                     case 4:
-                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 7];
-                        return [4 /*yield*/, delay(retryDelay)];
+                        success = _a.sent();
+                        _a.label = 5;
                     case 5:
-                        _a.sent();
-                        return [4 /*yield*/, attemptCapture(3)];
+                        if (!(!success && maxRetries >= 3)) return [3 /*break*/, 8];
+                        return [4 /*yield*/, delay(retryDelay)];
                     case 6:
                         _a.sent();
-                        _a.label = 7;
+                        return [4 /*yield*/, attemptCapture(3)];
                     case 7:
+                        _a.sent();
+                        _a.label = 8;
+                    case 8:
                         // 打印每个 source 的详细信息
                         sources.forEach(function (s, i) {
                             var size = s.thumbnail.getSize();
@@ -1250,7 +1257,7 @@ var Screenshots = /** @class */ (function (_super) {
                         }); };
                         // 串行处理每个显示器（需要等待 native fallback）
                         return [4 /*yield*/, displays.reduce(function (promise, display) { return promise.then(function () { return processDisplay(display); }); }, Promise.resolve())];
-                    case 8:
+                    case 9:
                         // 串行处理每个显示器（需要等待 native fallback）
                         _a.sent();
                         this.logger("[Capture] Total captures: ".concat(result.size, "/").concat(displays.length));
